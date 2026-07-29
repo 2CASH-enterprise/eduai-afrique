@@ -18,9 +18,28 @@ pipeline/      Génération et validation automatique des exercices
   test_generator_llm.py        Tests du générateur LLM avec un client Mistral simulé
 api/           API FastAPI
   app/main.py                  Point d'entrée
-  app/routers/                 auth, exercices (enseignant), eleve, direction, administration, parent
+  app/routers/                 auth, exercices (validation), eleve, direction, administration,
+                                parent, cours (dépôt + génération IA), classes (élèves/notes/absences)
   test_workflow*.py            Tests end-to-end par module (contre une vraie base PostgreSQL)
+frontend/      Interfaces React (à intégrer dans un projet Next.js)
+  espace-eleve.jsx              Connexion, exercices, corrigés, résultats
+  espace-enseignant.jsx         Préparation de cours (dépôt + génération IA), Mes classes
+                                 (élèves/notes/absences), file de validation — branché sur
+                                 l'API réelle via fetch() (voir API_BASE_URL en haut du fichier)
 ```
+
+## Frontend
+
+Les fichiers de `frontend/` sont des composants React autonomes (un `export default`
+par fichier), pensés pour être déposés dans les pages d'un projet Next.js
+(`app/eleve/page.jsx`, `app/enseignant/page.jsx`...). Ils utilisent Tailwind
+(classes du set par défaut, pas de configuration custom requise) et
+`lucide-react` pour les icônes.
+
+`espace-enseignant.jsx` est branché sur l'API réelle : modifiez la constante
+`API_BASE_URL` en haut du fichier pour pointer vers votre backend déployé.
+`espace-eleve.jsx` fonctionne encore avec des données de démonstration en
+dur — à brancher sur `/eleve/*` de la même façon.
 
 ## Démarrage local
 

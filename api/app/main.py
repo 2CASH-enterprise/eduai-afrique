@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from .routers import auth, exercices, eleve, direction, administration, parent
+from .routers import auth, exercices, eleve, direction, administration, parent, cours, classes
 
 app = FastAPI(
     title="ÉduAI Afrique — API",
@@ -14,6 +14,8 @@ app.include_router(eleve.router)
 app.include_router(direction.router)
 app.include_router(administration.router)
 app.include_router(parent.router)
+app.include_router(cours.router)
+app.include_router(classes.router)
 
 
 @app.get("/healthz")

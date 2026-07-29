@@ -293,6 +293,97 @@ class DevoirParent(BaseModel):
     date_limite: datetime
 
 
+class DepotCours(BaseModel):
+    titre: str
+    classe_id: str
+    matiere_id: str
+    contenu_texte: str | None = None
+    fichier_url: str | None = None
+    date_seance: str | None = None
+
+
+class RessourceGeneree(BaseModel):
+    type_ressource: str
+    statut: str
+    contenu: dict
+
+
+class CoursResume(BaseModel):
+    id: str
+    titre: str
+    matiere: str
+    classe: str
+    created_at: datetime
+    nombre_ressources_validees: int
+    nombre_ressources_total: int
+
+
+class CoursDetail(BaseModel):
+    id: str
+    titre: str
+    matiere: str
+    classe: str
+    contenu_texte: str | None
+    created_at: datetime
+    ressources: list[dict]
+
+
+class ModificationRessource(BaseModel):
+    contenu: dict | None = None
+    statut: str | None = None
+
+
+class ClasseEnseignant(BaseModel):
+    classe_id: str
+    matiere_id: str
+    nom: str
+    niveau: str
+    matiere: str
+    effectif: int
+    moyenne_classe: float | None
+
+
+class EleveResume(BaseModel):
+    eleve_id: str
+    nom: str
+    prenom: str
+    matricule: str | None
+    moyenne: float | None
+    nombre_absences: int
+
+
+class NoteDetail(BaseModel):
+    id: str
+    valeur: float
+    bareme: float
+    type_evaluation: str
+    trimestre: int
+    created_at: datetime
+
+
+class AbsenceDetail(BaseModel):
+    id: str
+    date_absence: str
+    type_absence: str
+    justifie: bool
+    motif: str | None
+
+
+class CreationNote(BaseModel):
+    matiere_id: str
+    valeur: float = Field(..., ge=0)
+    bareme: float = Field(20, gt=0)
+    type_evaluation: str = "controle"
+    trimestre: int = Field(..., ge=1, le=3)
+
+
+class CreationAbsence(BaseModel):
+    date_absence: str
+    type_absence: str = "absence"
+    justifie: bool = False
+    motif: str | None = None
+
+
 class ExerciceValide(BaseModel):
     id: str
     statut: str
