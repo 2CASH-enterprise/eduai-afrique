@@ -1,0 +1,14 @@
+# API
+fastapi
+uvicorn[standard]
+psycopg2-binary
+bcrypt
+pyjwt
+
+# Pipeline de génération d'exercices
+sympy
+num2words
+mistralai
+
+# Tests
+httpx
