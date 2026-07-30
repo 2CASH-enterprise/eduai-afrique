@@ -413,6 +413,21 @@ class CreationParent(BaseModel):
     eleve_ids: list[str] = Field(..., min_length=1, description="Au moins un enfant à lier")
 
 
+class ResultatLigneImport(BaseModel):
+    ligne: int
+    email: str | None
+    statut: str  # 'cree' | 'erreur'
+    mot_de_passe_provisoire: str | None = None
+    erreur: str | None = None
+
+
+class RapportImport(BaseModel):
+    total_lignes: int
+    nombre_crees: int
+    nombre_erreurs: int
+    resultats: list[ResultatLigneImport]
+
+
 class ExerciceValide(BaseModel):
     id: str
     statut: str

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   GraduationCap, Lock, Mail, LogOut, Bell, Loader2, AlertTriangle,
-  Users, Plus, UserX, ScrollText, Send, Wallet, Check, Copy,
+  Users, Plus, UserX, ScrollText, Send, Wallet, Check, Copy, Upload, FileSpreadsheet, Download,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -22,12 +22,19 @@ async function apiFetch(path, { method = "GET", token, body, params } = {}) {
     ).toString();
     if (qs) url += `?${qs}`;
   }
+  const estFormData = typeof FormData !== "undefined" && body instanceof FormData;
   let reponse;
   try {
     reponse = await fetch(url, {
       method,
-      headers: { ...(body ? { "Content-Type": "application/json" } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: body ? JSON.stringify(body) : undefined,
+      // Pour un FormData, on NE MET PAS Content-Type : le navigateur doit
+      // fixer lui-même la frontière multipart (boundary), sinon la requête
+      // est mal formée et l'API ne peut pas parser le fichier envoyé.
+      headers: {
+        ...(body && !estFormData ? { "Content-Type": "application/json" } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body ? (estFormData ? body : JSON.stringify(body)) : undefined,
     });
   } catch {
     throw new ErreurApi(`Impossible de joindre l'API (${API_BASE_URL}). Vérifiez qu'elle tourne et que CORS est activé.`);
@@ -228,6 +235,9 @@ function EcranUtilisateurs({ token, classes, matieres }) {
           <button onClick={() => setModalCreation("parent")} className="eduai-focus flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold border" style={{ borderColor: C.ligne, color: C.encre }}>
             <Plus size={13} /> Parent
           </button>
+          <button onClick={() => setModalCreation("import")} className="eduai-focus flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold border" style={{ borderColor: C.accent, color: C.accentFonce }}>
+            <Upload size={13} /> Importer un fichier
+          </button>
         </div>
       </div>
 
@@ -267,6 +277,7 @@ function EcranUtilisateurs({ token, classes, matieres }) {
       {modalCreation === "eleve" && <ModalCreationEleve token={token} classes={classes} onFerme={() => setModalCreation(null)} onCree={charger} />}
       {modalCreation === "enseignant" && <ModalCreationEnseignant token={token} classes={classes} matieres={matieres} onFerme={() => setModalCreation(null)} onCree={charger} />}
       {modalCreation === "parent" && <ModalCreationParent token={token} onFerme={() => setModalCreation(null)} onCree={charger} />}
+      {modalCreation === "import" && <ModalImportFichier token={token} onFerme={() => setModalCreation(null)} onCree={charger} />}
     </div>
   );
 }
@@ -565,6 +576,136 @@ function ModalCreationParent({ token, onFerme, onCree }) {
               <button type="button" onClick={onFerme} className="eduai-focus text-xs font-medium" style={{ color: C.encreDoux }}>Annuler</button>
             </div>
           </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function telechargerCSV(nomFichier, contenu) {
+  const blob = new Blob([contenu], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = nomFichier;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+const MODELE_ELEVES = "email,nom,prenom,classe,matricule\nexemple.eleve@ecole.cm,Dupont,Jean,6ème A,MAT001\n";
+const MODELE_ENSEIGNANTS = "email,nom,prenom,specialite,affectations\nexemple.prof@ecole.cm,Nguema,Sophie,Mathématiques,\"6ème A:Mathématiques;6ème B:Mathématiques\"\n";
+
+function ModalImportFichier({ token, onFerme, onCree }) {
+  const [type, setType] = useState("eleve");
+  const [fichier, setFichier] = useState(null);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState(null);
+  const [rapport, setRapport] = useState(null);
+
+  async function soumettre(e) {
+    e.preventDefault();
+    if (!fichier) return;
+    setEnvoi(true); setErreur(null);
+    try {
+      const formData = new FormData();
+      formData.append("fichier", fichier);
+      const chemin = type === "eleve" ? "/administration/eleves/import" : "/administration/enseignants/import";
+      const r = await apiFetch(chemin, { method: "POST", token, body: formData });
+      setRapport(r);
+      if (r.nombre_crees > 0) onCree();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoi(false); }
+  }
+
+  function exporterRapport() {
+    const entete = "ligne,email,statut,mot_de_passe_provisoire,erreur\n";
+    const corps = rapport.resultats.map((r) =>
+      [r.ligne, r.email || "", r.statut, r.mot_de_passe_provisoire || "", (r.erreur || "").replace(/,/g, ";")].join(",")
+    ).join("\n");
+    telechargerCSV(`rapport-import-${type}s.csv`, entete + corps);
+  }
+
+  return (
+    <div className="fixed inset-0 z-20 flex items-center justify-center px-6" style={{ backgroundColor: "rgba(34,48,74,0.45)" }}>
+      <div className="w-full max-w-lg rounded-2xl p-6 eduai-fade-in max-h-[90vh] overflow-y-auto" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre }}>
+        <h3 className="eduai-display text-lg mb-4 flex items-center gap-2" style={{ color: C.encre }}>
+          <FileSpreadsheet size={18} color={C.accentFonce} /> Importer un fichier
+        </h3>
+
+        {!rapport ? (
+          <form onSubmit={soumettre} className="space-y-4">
+            <BandeauErreur message={erreur} />
+
+            <div className="flex gap-2">
+              <ChipMatiere label="Élèves" active={type === "eleve"} onClick={() => setType("eleve")} />
+              <ChipMatiere label="Enseignants" active={type === "enseignant"} onClick={() => setType("enseignant")} />
+            </div>
+
+            <div className="rounded-lg p-3 border text-xs" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encreDoux }}>
+              <p className="font-medium mb-1" style={{ color: C.encre }}>Colonnes attendues :</p>
+              {type === "eleve" ? (
+                <p>email, nom, prenom, classe, matricule (optionnel)</p>
+              ) : (
+                <p>email, nom, prenom, specialite (optionnel), affectations (optionnel — format « Classe:Matière;Classe:Matière »)</p>
+              )}
+              <button
+                type="button"
+                onClick={() => telechargerCSV(`modele-${type}s.csv`, type === "eleve" ? MODELE_ELEVES : MODELE_ENSEIGNANTS)}
+                className="eduai-focus flex items-center gap-1 mt-2 font-medium" style={{ color: C.accentFonce }}
+              >
+                <Download size={12} /> Télécharger un modèle CSV
+              </button>
+            </div>
+
+            <label
+              className="eduai-focus flex items-center gap-2.5 rounded-lg px-3.5 py-3 border border-dashed cursor-pointer"
+              style={{ borderColor: C.accent, backgroundColor: C.fond }}
+            >
+              <Upload size={16} color={C.accentFonce} />
+              <span className="text-xs" style={{ color: C.encreDoux }}>
+                {fichier ? fichier.name : "Choisir un fichier CSV ou Excel (.xlsx)"}
+              </span>
+              <input type="file" accept=".csv,.xlsx" className="hidden" onChange={(e) => setFichier(e.target.files[0] || null)} />
+            </label>
+
+            <div className="flex gap-2 pt-1">
+              <button type="submit" disabled={envoi || !fichier} className="eduai-focus flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
+                {envoi && <Loader2 size={12} className="eduai-spin" />} Importer
+              </button>
+              <button type="button" onClick={onFerme} className="eduai-focus text-xs font-medium" style={{ color: C.encreDoux }}>Annuler</button>
+            </div>
+          </form>
+        ) : (
+          <div>
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="rounded-lg p-3 text-center" style={{ backgroundColor: C.fond }}>
+                <p className="eduai-display text-xl" style={{ color: C.encre }}>{rapport.total_lignes}</p>
+                <p className="text-[11px]" style={{ color: C.encreDoux }}>lignes</p>
+              </div>
+              <div className="rounded-lg p-3 text-center" style={{ backgroundColor: C.vertFond }}>
+                <p className="eduai-display text-xl" style={{ color: C.vert }}>{rapport.nombre_crees}</p>
+                <p className="text-[11px]" style={{ color: C.vert }}>créés</p>
+              </div>
+              <div className="rounded-lg p-3 text-center" style={{ backgroundColor: C.rougeFond }}>
+                <p className="eduai-display text-xl" style={{ color: C.rouge }}>{rapport.nombre_erreurs}</p>
+                <p className="text-[11px]" style={{ color: C.rouge }}>erreurs</p>
+              </div>
+            </div>
+
+            <button onClick={exporterRapport} className="eduai-focus w-full flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-xs font-semibold mb-4" style={{ backgroundColor: C.encre, color: C.surface }}>
+              <Download size={13} /> Télécharger le rapport complet (mots de passe inclus)
+            </button>
+
+            <div className="max-h-64 overflow-y-auto rounded-lg border" style={{ borderColor: C.ligne }}>
+              {rapport.resultats.map((r, i) => (
+                <div key={i} className="px-3 py-2 text-xs flex items-center justify-between" style={{ borderTop: i > 0 ? `1px solid ${C.ligne}` : "none" }}>
+                  <span style={{ color: C.encre }}>L{r.ligne} · {r.email || "—"}</span>
+                  <span style={{ color: r.statut === "cree" ? C.vert : C.rouge }}>{r.statut === "cree" ? "✓ créé" : r.erreur}</span>
+                </div>
+              ))}
+            </div>
+
+            <button onClick={onFerme} className="eduai-focus w-full rounded-lg py-2.5 text-sm font-semibold mt-4" style={{ backgroundColor: C.fond, color: C.encre }}>Fermer</button>
+          </div>
         )}
       </div>
     </div>

@@ -1,7 +1,10 @@
+import csv
+import io
 import secrets
 
+import openpyxl
 import psycopg2
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
 from ..db import get_cursor
 from ..deps import get_administratif_connecte
@@ -10,6 +13,7 @@ from ..schemas import (CreationEleve, CreationEnseignant, CreationParent, Compte
                         GenerationBulletins, BulletinGenere, DiffusionNotification,
                         DiffusionResultat, EncaissementPaiement, PaiementMisAJour,
                         ClasseResume, MatiereResume, PaiementAdmin,
+                        RapportImport, ResultatLigneImport,
                         AdministratifConnecte)
 
 router = APIRouter(prefix="/administration", tags=["administration"])
@@ -29,6 +33,111 @@ def _verifier_classe_dans_etablissement(cur, classe_id: str, etablissement_id: s
                              detail="Classe introuvable dans votre établissement")
 
 
+def _lire_fichier_tabulaire(upload_file: UploadFile) -> list[dict]:
+    """Lit un CSV ou un Excel (.xlsx) et renvoie une liste de dicts, une par
+    ligne, avec des clés normalisées (minuscules, espaces retirés) — pour
+    que les en-têtes 'Email', 'email', ' Email ' soient tous acceptés.
+    """
+    contenu = upload_file.file.read()
+    nom_fichier = (upload_file.filename or "").lower()
+
+    if nom_fichier.endswith(".xlsx"):
+        classeur = openpyxl.load_workbook(io.BytesIO(contenu), read_only=True, data_only=True)
+        feuille = classeur.active
+        lignes = list(feuille.iter_rows(values_only=True))
+        if not lignes:
+            return []
+        entetes = [str(h).strip().lower() if h is not None else "" for h in lignes[0]]
+        resultats = []
+        for ligne in lignes[1:]:
+            if all(v is None for v in ligne):
+                continue  # ligne vide, courant en fin de fichier Excel
+            resultats.append({entetes[i]: (str(ligne[i]).strip() if ligne[i] is not None else "")
+                               for i in range(len(entetes))})
+        return resultats
+
+    # CSV par défaut — utf-8-sig gère le BOM ajouté par Excel à l'export CSV
+    texte = contenu.decode("utf-8-sig")
+    lecteur = csv.DictReader(io.StringIO(texte))
+    return [{(k or "").strip().lower(): (v or "").strip() for k, v in ligne.items()} for ligne in lecteur]
+
+
+def _resoudre_classe_par_nom(cur, etablissement_id: str, nom_classe: str) -> str:
+    cur.execute("SELECT id FROM classes WHERE etablissement_id = %s AND nom = %s", (etablissement_id, nom_classe))
+    row = cur.fetchone()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Classe « {nom_classe} » introuvable")
+    return row[0]
+
+
+def _resoudre_matiere_par_nom(cur, nom_matiere: str) -> str:
+    cur.execute("SELECT id FROM matieres WHERE nom = %s", (nom_matiere,))
+    row = cur.fetchone()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Matière « {nom_matiere} » introuvable")
+    return row[0]
+
+
+def _parser_affectations(cur, etablissement_id: str, texte: str) -> list[tuple[str, str]]:
+    """Format attendu dans la colonne 'affectations' : 'Classe:Matière' pour
+    chaque affectation, séparées par ';'. Ex : '6ème A:Mathématiques;6ème B:Mathématiques'.
+    Colonne vide ou absente = aucune affectation (à ajouter plus tard)."""
+    if not texte:
+        return []
+    resultat = []
+    for paire in (p.strip() for p in texte.split(";") if p.strip()):
+        if ":" not in paire:
+            raise HTTPException(status_code=422,
+                                 detail=f"Format d'affectation invalide : « {paire} » (attendu Classe:Matière)")
+        nom_classe, nom_matiere = (x.strip() for x in paire.split(":", 1))
+        resultat.append((_resoudre_classe_par_nom(cur, etablissement_id, nom_classe),
+                          _resoudre_matiere_par_nom(cur, nom_matiere)))
+    return resultat
+
+
+def _creer_compte_eleve_core(cur, etablissement_id: str, email: str, nom: str, prenom: str,
+                               classe_id: str, matricule: str | None) -> tuple[str, str]:
+    """Cœur de la création d'un compte élève, réutilisé par l'endpoint
+    unitaire et par l'import en masse — pour ne jamais avoir deux versions
+    de cette logique qui pourraient diverger silencieusement."""
+    mot_de_passe = _generer_mot_de_passe_provisoire()
+    cur.execute(
+        """
+        INSERT INTO utilisateurs (etablissement_id, role, email, mot_de_passe_hash, nom, prenom)
+        VALUES (%s, 'eleve', %s, %s, %s, %s) RETURNING id
+        """,
+        (etablissement_id, email, hacher_mot_de_passe(mot_de_passe), nom, prenom),
+    )
+    utilisateur_id = cur.fetchone()[0]
+    cur.execute(
+        "INSERT INTO eleves (utilisateur_id, classe_id, matricule) VALUES (%s, %s, %s)",
+        (utilisateur_id, classe_id, matricule or None),
+    )
+    return str(utilisateur_id), mot_de_passe
+
+
+def _creer_compte_enseignant_core(cur, etablissement_id: str, email: str, nom: str, prenom: str,
+                                    specialite: str | None, affectations: list[tuple[str, str]]) -> tuple[str, str]:
+    mot_de_passe = _generer_mot_de_passe_provisoire()
+    cur.execute(
+        """
+        INSERT INTO utilisateurs (etablissement_id, role, email, mot_de_passe_hash, nom, prenom)
+        VALUES (%s, 'enseignant', %s, %s, %s, %s) RETURNING id
+        """,
+        (etablissement_id, email, hacher_mot_de_passe(mot_de_passe), nom, prenom),
+    )
+    utilisateur_id = cur.fetchone()[0]
+    cur.execute("INSERT INTO enseignants (utilisateur_id, specialite) VALUES (%s, %s)",
+                (utilisateur_id, specialite or None))
+    for classe_id, matiere_id in affectations:
+        cur.execute(
+            "INSERT INTO affectations_enseignants (enseignant_id, classe_id, matiere_id) "
+            "VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
+            (utilisateur_id, classe_id, matiere_id),
+        )
+    return str(utilisateur_id), mot_de_passe
+
+
 @router.post("/eleves", response_model=CompteCree, status_code=status.HTTP_201_CREATED)
 def creer_eleve(
     payload: CreationEleve,
@@ -36,27 +145,15 @@ def creer_eleve(
 ):
     with get_cursor(commit=True) as cur:
         _verifier_classe_dans_etablissement(cur, payload.classe_id, admin.etablissement_id)
-
-        mot_de_passe = _generer_mot_de_passe_provisoire()
         try:
-            cur.execute(
-                """
-                INSERT INTO utilisateurs (etablissement_id, role, email, mot_de_passe_hash, nom, prenom)
-                VALUES (%s, 'eleve', %s, %s, %s, %s) RETURNING id
-                """,
-                (admin.etablissement_id, payload.email, hacher_mot_de_passe(mot_de_passe),
-                 payload.nom, payload.prenom),
-            )
-            utilisateur_id = cur.fetchone()[0]
-            cur.execute(
-                "INSERT INTO eleves (utilisateur_id, classe_id, matricule) VALUES (%s, %s, %s)",
-                (utilisateur_id, payload.classe_id, payload.matricule),
-            )
+            utilisateur_id, mot_de_passe = _creer_compte_eleve_core(
+                cur, admin.etablissement_id, payload.email, payload.nom, payload.prenom,
+                payload.classe_id, payload.matricule)
         except psycopg2.errors.UniqueViolation:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                                  detail="Un compte existe déjà avec cet email ou ce matricule")
 
-    return CompteCree(id=str(utilisateur_id), email=payload.email, mot_de_passe_provisoire=mot_de_passe)
+    return CompteCree(id=utilisateur_id, email=payload.email, mot_de_passe_provisoire=mot_de_passe)
 
 
 @router.post("/enseignants", response_model=CompteCree, status_code=status.HTTP_201_CREATED)
@@ -68,33 +165,15 @@ def creer_enseignant(
         for affectation in payload.affectations:
             _verifier_classe_dans_etablissement(cur, affectation["classe_id"], admin.etablissement_id)
 
-        mot_de_passe = _generer_mot_de_passe_provisoire()
         try:
-            cur.execute(
-                """
-                INSERT INTO utilisateurs (etablissement_id, role, email, mot_de_passe_hash, nom, prenom)
-                VALUES (%s, 'enseignant', %s, %s, %s, %s) RETURNING id
-                """,
-                (admin.etablissement_id, payload.email, hacher_mot_de_passe(mot_de_passe),
-                 payload.nom, payload.prenom),
-            )
-            utilisateur_id = cur.fetchone()[0]
-            cur.execute("INSERT INTO enseignants (utilisateur_id, specialite) VALUES (%s, %s)",
-                        (utilisateur_id, payload.specialite))
-
-            for affectation in payload.affectations:
-                cur.execute(
-                    """
-                    INSERT INTO affectations_enseignants (enseignant_id, classe_id, matiere_id)
-                    VALUES (%s, %s, %s) ON CONFLICT DO NOTHING
-                    """,
-                    (utilisateur_id, affectation["classe_id"], affectation["matiere_id"]),
-                )
+            utilisateur_id, mot_de_passe = _creer_compte_enseignant_core(
+                cur, admin.etablissement_id, payload.email, payload.nom, payload.prenom, payload.specialite,
+                [(a["classe_id"], a["matiere_id"]) for a in payload.affectations])
         except psycopg2.errors.UniqueViolation:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                                  detail="Un compte existe déjà avec cet email")
 
-    return CompteCree(id=str(utilisateur_id), email=payload.email, mot_de_passe_provisoire=mot_de_passe)
+    return CompteCree(id=utilisateur_id, email=payload.email, mot_de_passe_provisoire=mot_de_passe)
 
 
 @router.post("/parents", response_model=CompteCree, status_code=status.HTTP_201_CREATED)
@@ -388,3 +467,86 @@ def lister_paiements(
                             montant_du=float(du), montant_paye=float(paye), statut=st,
                             date_echeance=str(echeance) if echeance else None)
             for id_, nom, prenom, classe, du, paye, st, echeance in lignes]
+
+
+@router.post("/eleves/import", response_model=RapportImport)
+async def importer_eleves(
+    fichier: UploadFile = File(...),
+    admin: AdministratifConnecte = Depends(get_administratif_connecte),
+):
+    """Import en masse depuis un CSV ou Excel. Colonnes attendues :
+    email, nom, prenom, classe, matricule (matricule optionnel).
+    Une transaction PAR LIGNE — une ligne en erreur (email en doublon, classe
+    introuvable...) n'empêche jamais les autres lignes d'être traitées.
+    """
+    lignes = _lire_fichier_tabulaire(fichier)
+    resultats: list[ResultatLigneImport] = []
+
+    for i, ligne in enumerate(lignes):
+        numero_ligne = i + 2  # +1 pour l'en-tête, +1 pour l'indexation à 1
+        email = ligne.get("email", "").strip()
+        try:
+            if not email or not ligne.get("nom") or not ligne.get("prenom") or not ligne.get("classe"):
+                raise HTTPException(status_code=422, detail="Colonnes obligatoires manquantes (email, nom, prenom, classe)")
+
+            with get_cursor(commit=True) as cur:
+                classe_id = _resoudre_classe_par_nom(cur, admin.etablissement_id, ligne["classe"])
+                utilisateur_id, mot_de_passe = _creer_compte_eleve_core(
+                    cur, admin.etablissement_id, email, ligne["nom"], ligne["prenom"],
+                    classe_id, ligne.get("matricule"))
+
+            resultats.append(ResultatLigneImport(ligne=numero_ligne, email=email, statut="cree",
+                                                   mot_de_passe_provisoire=mot_de_passe))
+        except HTTPException as e:
+            resultats.append(ResultatLigneImport(ligne=numero_ligne, email=email or None, statut="erreur",
+                                                   erreur=str(e.detail)))
+        except psycopg2.errors.UniqueViolation:
+            resultats.append(ResultatLigneImport(ligne=numero_ligne, email=email or None, statut="erreur",
+                                                   erreur="Email ou matricule déjà utilisé"))
+        except Exception as e:
+            resultats.append(ResultatLigneImport(ligne=numero_ligne, email=email or None, statut="erreur",
+                                                   erreur=f"Erreur inattendue : {e}"))
+
+    crees = sum(1 for r in resultats if r.statut == "cree")
+    return RapportImport(total_lignes=len(lignes), nombre_crees=crees,
+                          nombre_erreurs=len(lignes) - crees, resultats=resultats)
+
+
+@router.post("/enseignants/import", response_model=RapportImport)
+async def importer_enseignants(
+    fichier: UploadFile = File(...),
+    admin: AdministratifConnecte = Depends(get_administratif_connecte),
+):
+    """Colonnes attendues : email, nom, prenom, specialite (optionnel),
+    affectations (optionnel, format 'Classe:Matière;Classe:Matière')."""
+    lignes = _lire_fichier_tabulaire(fichier)
+    resultats: list[ResultatLigneImport] = []
+
+    for i, ligne in enumerate(lignes):
+        numero_ligne = i + 2
+        email = ligne.get("email", "").strip()
+        try:
+            if not email or not ligne.get("nom") or not ligne.get("prenom"):
+                raise HTTPException(status_code=422, detail="Colonnes obligatoires manquantes (email, nom, prenom)")
+
+            with get_cursor(commit=True) as cur:
+                affectations = _parser_affectations(cur, admin.etablissement_id, ligne.get("affectations", ""))
+                utilisateur_id, mot_de_passe = _creer_compte_enseignant_core(
+                    cur, admin.etablissement_id, email, ligne["nom"], ligne["prenom"],
+                    ligne.get("specialite"), affectations)
+
+            resultats.append(ResultatLigneImport(ligne=numero_ligne, email=email, statut="cree",
+                                                   mot_de_passe_provisoire=mot_de_passe))
+        except HTTPException as e:
+            resultats.append(ResultatLigneImport(ligne=numero_ligne, email=email or None, statut="erreur",
+                                                   erreur=str(e.detail)))
+        except psycopg2.errors.UniqueViolation:
+            resultats.append(ResultatLigneImport(ligne=numero_ligne, email=email or None, statut="erreur",
+                                                   erreur="Email déjà utilisé"))
+        except Exception as e:
+            resultats.append(ResultatLigneImport(ligne=numero_ligne, email=email or None, statut="erreur",
+                                                   erreur=f"Erreur inattendue : {e}"))
+
+    crees = sum(1 for r in resultats if r.statut == "cree")
+    return RapportImport(total_lignes=len(lignes), nombre_crees=crees,
+                          nombre_erreurs=len(lignes) - crees, resultats=resultats)
