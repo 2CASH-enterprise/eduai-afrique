@@ -14,7 +14,7 @@ import {
 
 // À adapter à la main selon où tourne votre backend (dev local, VPS...).
 // Ex : "http://89.116.111.3:8000" une fois l'API déployée sur le serveur.
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = "http://89.116.111.3:8000";
 
 class ErreurApi extends Error {}
 

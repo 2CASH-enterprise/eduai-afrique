@@ -8,7 +8,7 @@ import {
 /*  Configuration API                                                  */
 /* ------------------------------------------------------------------ */
 
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = "http://89.116.111.3:8000";
 
 class ErreurApi extends Error {}
 
