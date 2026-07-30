@@ -21,25 +21,36 @@ api/           API FastAPI
   app/routers/                 auth, exercices (validation), eleve, direction, administration,
                                 parent, cours (dépôt + génération IA), classes (élèves/notes/absences)
   test_workflow*.py            Tests end-to-end par module (contre une vraie base PostgreSQL)
-frontend/      Interfaces React (à intégrer dans un projet Next.js)
-  espace-eleve.jsx              Connexion, exercices, corrigés, résultats
-  espace-enseignant.jsx         Préparation de cours (dépôt + génération IA), Mes classes
-                                 (élèves/notes/absences), file de validation — branché sur
-                                 l'API réelle via fetch() (voir API_BASE_URL en haut du fichier)
+frontend/      Composants React autonomes (démo/référence, un fichier par espace)
+web/           Vrai projet Next.js assemblant les 5 espaces avec navigation
+  app/page.jsx                  Portail d'accueil (choix de l'espace)
+  app/{eleve,enseignant,...}/    Une route par espace
+  components/Espace*.jsx        Composants clients (mêmes fichiers que frontend/,
+                                 adaptés avec "use client" pour l'App Router)
 ```
 
 ## Frontend
 
-Les fichiers de `frontend/` sont des composants React autonomes (un `export default`
-par fichier), pensés pour être déposés dans les pages d'un projet Next.js
-(`app/eleve/page.jsx`, `app/enseignant/page.jsx`...). Ils utilisent Tailwind
-(classes du set par défaut, pas de configuration custom requise) et
-`lucide-react` pour les icônes.
+Deux façons d'utiliser les interfaces React :
 
-`espace-enseignant.jsx` est branché sur l'API réelle : modifiez la constante
-`API_BASE_URL` en haut du fichier pour pointer vers votre backend déployé.
-`espace-eleve.jsx` fonctionne encore avec des données de démonstration en
-dur — à brancher sur `/eleve/*` de la même façon.
+**`web/` (recommandé)** — un vrai projet Next.js, prêt à lancer :
+```bash
+cd web
+npm install
+npm run dev
+# http://localhost:3000 — portail avec les 5 espaces
+```
+Build de production vérifié (`npm run build` compile sans erreur, les 6
+routes répondent en 200). Avant de déployer, changez `API_BASE_URL` en haut
+de chaque fichier dans `web/components/Espace*.jsx` pour pointer vers votre
+API en production.
+
+**`frontend/`** — les mêmes composants en fichiers autonomes, utiles pour
+prévisualiser ou modifier un espace isolément sans lancer tout le projet Next.js.
+
+`espace-enseignant.jsx` (et les autres) sont branchés sur l'API réelle :
+modifiez la constante `API_BASE_URL` en haut du fichier pour pointer vers
+votre backend déployé.
 
 ## Démarrage local
 
