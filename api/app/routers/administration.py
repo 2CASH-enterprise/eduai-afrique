@@ -9,6 +9,7 @@ from ..security import hacher_mot_de_passe
 from ..schemas import (CreationEleve, CreationEnseignant, CompteCree, UtilisateurResume,
                         GenerationBulletins, BulletinGenere, DiffusionNotification,
                         DiffusionResultat, EncaissementPaiement, PaiementMisAJour,
+                        ClasseResume, MatiereResume, PaiementAdmin,
                         AdministratifConnecte)
 
 router = APIRouter(prefix="/administration", tags=["administration"])
@@ -154,6 +155,16 @@ def generer_bulletins(
         _verifier_classe_dans_etablissement(cur, payload.classe_id, admin.etablissement_id)
 
         cur.execute(
+            "SELECT id FROM annees_scolaires WHERE etablissement_id = %s AND est_active = true LIMIT 1",
+            (admin.etablissement_id,),
+        )
+        annee = cur.fetchone()
+        if annee is None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                 detail="Aucune année scolaire active pour cet établissement")
+        annee_scolaire_id = annee[0]
+
+        cur.execute(
             """
             SELECT el.utilisateur_id, u.nom || ' ' || u.prenom,
                    AVG(v.moyenne_sur_20)
@@ -164,7 +175,7 @@ def generer_bulletins(
             WHERE el.classe_id = %s
             GROUP BY el.utilisateur_id, u.nom, u.prenom
             """,
-            (payload.trimestre, payload.annee_scolaire_id, payload.classe_id),
+            (payload.trimestre, annee_scolaire_id, payload.classe_id),
         )
         eleves = cur.fetchall()  # (eleve_id, nom_complet, moyenne_generale ou None)
 
@@ -183,7 +194,7 @@ def generer_bulletins(
                 DO UPDATE SET moyenne_generale = EXCLUDED.moyenne_generale,
                               rang_classe = EXCLUDED.rang_classe, genere_le = now()
                 """,
-                (eleve_id, payload.annee_scolaire_id, payload.trimestre,
+                (eleve_id, annee_scolaire_id, payload.trimestre,
                  round(float(moyenne), 2) if moyenne is not None else None, rang),
             )
             resultats.append(BulletinGenere(
@@ -280,3 +291,54 @@ def encaisser_paiement(
 
     return PaiementMisAJour(id=str(resultat[0]), montant_du=float(resultat[1]),
                               montant_paye=float(resultat[2]), statut=resultat[3])
+
+
+@router.get("/classes", response_model=list[ClasseResume])
+def lister_classes(admin: AdministratifConnecte = Depends(get_administratif_connecte)):
+    with get_cursor() as cur:
+        cur.execute(
+            """
+            SELECT c.id, c.nom, n.nom
+            FROM classes c JOIN niveaux n ON n.id = c.niveau_id
+            WHERE c.etablissement_id = %s
+            ORDER BY n.ordre, c.nom
+            """,
+            (admin.etablissement_id,),
+        )
+        lignes = cur.fetchall()
+    return [ClasseResume(id=str(id_), nom=nom, niveau=niveau) for id_, nom, niveau in lignes]
+
+
+@router.get("/matieres", response_model=list[MatiereResume])
+def lister_matieres(admin: AdministratifConnecte = Depends(get_administratif_connecte)):
+    # Référentiel global (pas d'etablissement_id sur `matieres`) — commun à tous.
+    with get_cursor() as cur:
+        cur.execute("SELECT id, nom FROM matieres ORDER BY nom")
+        lignes = cur.fetchall()
+    return [MatiereResume(id=str(id_), nom=nom) for id_, nom in lignes]
+
+
+@router.get("/paiements", response_model=list[PaiementAdmin])
+def lister_paiements(
+    admin: AdministratifConnecte = Depends(get_administratif_connecte),
+    statut: str | None = None,
+):
+    with get_cursor() as cur:
+        cur.execute(
+            """
+            SELECT p.id, u.nom, u.prenom, c.nom, p.montant_du, p.montant_paye, p.statut, p.date_echeance
+            FROM paiements p
+            JOIN eleves el ON el.utilisateur_id = p.eleve_id
+            JOIN utilisateurs u ON u.id = el.utilisateur_id
+            JOIN classes c ON c.id = el.classe_id
+            WHERE c.etablissement_id = %s
+              AND (%s::text IS NULL OR p.statut = %s)
+            ORDER BY p.date_echeance ASC NULLS LAST
+            """,
+            (admin.etablissement_id, statut, statut),
+        )
+        lignes = cur.fetchall()
+    return [PaiementAdmin(id=str(id_), eleve_nom=nom, eleve_prenom=prenom, classe=classe,
+                            montant_du=float(du), montant_paye=float(paye), statut=st,
+                            date_echeance=str(echeance) if echeance else None)
+            for id_, nom, prenom, classe, du, paye, st, echeance in lignes]

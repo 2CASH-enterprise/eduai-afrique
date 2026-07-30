@@ -208,7 +208,6 @@ class UtilisateurResume(BaseModel):
 class GenerationBulletins(BaseModel):
     classe_id: str
     trimestre: int = Field(..., ge=1, le=3)
-    annee_scolaire_id: str
 
 
 class BulletinGenere(BaseModel):
@@ -382,6 +381,28 @@ class CreationAbsence(BaseModel):
     type_absence: str = "absence"
     justifie: bool = False
     motif: str | None = None
+
+
+class ClasseResume(BaseModel):
+    id: str
+    nom: str
+    niveau: str
+
+
+class MatiereResume(BaseModel):
+    id: str
+    nom: str
+
+
+class PaiementAdmin(BaseModel):
+    id: str
+    eleve_nom: str
+    eleve_prenom: str
+    classe: str
+    montant_du: float
+    montant_paye: float
+    statut: str
+    date_echeance: str | None
 
 
 class ExerciceValide(BaseModel):
