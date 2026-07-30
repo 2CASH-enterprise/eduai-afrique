@@ -223,6 +223,9 @@ function EcranUtilisateurs({ token, classes, matieres }) {
           <button onClick={() => setModalCreation("enseignant")} className="eduai-focus flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold border" style={{ borderColor: C.ligne, color: C.encre }}>
             <Plus size={13} /> Enseignant
           </button>
+          <button onClick={() => setModalCreation("parent")} className="eduai-focus flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold border" style={{ borderColor: C.ligne, color: C.encre }}>
+            <Plus size={13} /> Parent
+          </button>
         </div>
       </div>
 
@@ -261,6 +264,7 @@ function EcranUtilisateurs({ token, classes, matieres }) {
 
       {modalCreation === "eleve" && <ModalCreationEleve token={token} classes={classes} onFerme={() => setModalCreation(null)} onCree={charger} />}
       {modalCreation === "enseignant" && <ModalCreationEnseignant token={token} classes={classes} matieres={matieres} onFerme={() => setModalCreation(null)} onCree={charger} />}
+      {modalCreation === "parent" && <ModalCreationParent token={token} onFerme={() => setModalCreation(null)} onCree={charger} />}
     </div>
   );
 }
@@ -407,6 +411,93 @@ function ModalCreationEnseignant({ token, classes, matieres, onFerme, onCree }) 
 
             <div className="flex gap-2 pt-1">
               <button type="submit" disabled={envoi} className="eduai-focus flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
+                {envoi && <Loader2 size={12} className="eduai-spin" />} Créer
+              </button>
+              <button type="button" onClick={onFerme} className="eduai-focus text-xs font-medium" style={{ color: C.encreDoux }}>Annuler</button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ModalCreationParent({ token, onFerme, onCree }) {
+  const [eleves, setEleves] = useState([]);
+  const [chargementEleves, setChargementEleves] = useState(true);
+  const [email, setEmail] = useState("");
+  const [nom, setNom] = useState("");
+  const [prenom, setPrenom] = useState("");
+  const [elevesChoisis, setElevesChoisis] = useState([]);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState(null);
+  const [resultat, setResultat] = useState(null);
+
+  useEffect(() => {
+    // Chargée indépendamment du filtre de l'écran principal — sinon, si
+    // l'admin avait "Enseignants" sélectionné en arrivant ici, la liste
+    // des élèves disponibles serait vide.
+    apiFetch("/administration/utilisateurs", { token, params: { role: "eleve" } })
+      .then(setEleves).catch(() => {}).finally(() => setChargementEleves(false));
+  }, [token]);
+
+  function basculerEleve(id) {
+    setElevesChoisis((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  async function soumettre(e) {
+    e.preventDefault();
+    setEnvoi(true); setErreur(null);
+    try {
+      const r = await apiFetch("/administration/parents", { method: "POST", token, body: { email, nom, prenom, eleve_ids: elevesChoisis } });
+      setResultat(r); onCree();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoi(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-20 flex items-center justify-center px-6" style={{ backgroundColor: "rgba(34,48,74,0.45)" }}>
+      <div className="w-full max-w-sm rounded-2xl p-6 eduai-fade-in max-h-[90vh] overflow-y-auto" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre }}>
+        <h3 className="eduai-display text-lg mb-4" style={{ color: C.encre }}>Nouveau parent</h3>
+        {resultat ? (
+          <div>
+            <BandeauSucces message="Compte créé." />
+            <p className="text-xs mb-1" style={{ color: C.encreDoux }}>Mot de passe provisoire :</p>
+            <div className="eduai-mono text-sm rounded-lg px-3 py-2 mb-4" style={{ backgroundColor: C.fond, color: C.encre }}>{resultat.mot_de_passe_provisoire}</div>
+            <button onClick={onFerme} className="eduai-focus w-full rounded-lg py-2.5 text-sm font-semibold" style={{ backgroundColor: C.encre, color: C.surface }}>Fermer</button>
+          </div>
+        ) : (
+          <form onSubmit={soumettre} className="space-y-3">
+            <BandeauErreur message={erreur} />
+            <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email"
+              className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
+            <div className="grid grid-cols-2 gap-2">
+              <input required value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom"
+                className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
+              <input required value={prenom} onChange={(e) => setPrenom(e.target.value)} placeholder="Prénom"
+                className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
+            </div>
+
+            <div className="rounded-lg p-3 border" style={{ borderColor: C.ligne, backgroundColor: C.fond }}>
+              <p className="text-xs font-medium mb-2" style={{ color: C.encreDoux }}>Enfant(s) à lier</p>
+              {chargementEleves ? (
+                <p className="text-xs" style={{ color: C.encreAttenue }}>Chargement...</p>
+              ) : eleves.length === 0 ? (
+                <p className="text-xs" style={{ color: C.encreAttenue }}>Aucun élève trouvé — créez d'abord un compte élève.</p>
+              ) : (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {eleves.map((el) => (
+                    <label key={el.id} className="flex items-center gap-2 text-xs" style={{ color: C.encre }}>
+                      <input type="checkbox" checked={elevesChoisis.includes(el.id)} onChange={() => basculerEleve(el.id)} />
+                      {el.nom} {el.prenom} {el.classe ? `— ${el.classe}` : ""}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button type="submit" disabled={envoi || elevesChoisis.length === 0} className="eduai-focus flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
                 {envoi && <Loader2 size={12} className="eduai-spin" />} Créer
               </button>
               <button type="button" onClick={onFerme} className="eduai-focus text-xs font-medium" style={{ color: C.encreDoux }}>Annuler</button>

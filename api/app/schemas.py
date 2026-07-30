@@ -406,6 +406,13 @@ class PaiementAdmin(BaseModel):
     date_echeance: str | None
 
 
+class CreationParent(BaseModel):
+    email: str
+    nom: str
+    prenom: str
+    eleve_ids: list[str] = Field(..., min_length=1, description="Au moins un enfant à lier")
+
+
 class ExerciceValide(BaseModel):
     id: str
     statut: str

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from ..db import get_cursor
 from ..deps import get_administratif_connecte
 from ..security import hacher_mot_de_passe
-from ..schemas import (CreationEleve, CreationEnseignant, CompteCree, UtilisateurResume,
+from ..schemas import (CreationEleve, CreationEnseignant, CreationParent, CompteCree, UtilisateurResume,
                         GenerationBulletins, BulletinGenere, DiffusionNotification,
                         DiffusionResultat, EncaissementPaiement, PaiementMisAJour,
                         ClasseResume, MatiereResume, PaiementAdmin,
@@ -93,6 +93,52 @@ def creer_enseignant(
         except psycopg2.errors.UniqueViolation:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                                  detail="Un compte existe déjà avec cet email")
+
+    return CompteCree(id=str(utilisateur_id), email=payload.email, mot_de_passe_provisoire=mot_de_passe)
+
+
+@router.post("/parents", response_model=CompteCree, status_code=status.HTTP_201_CREATED)
+def creer_parent(
+    payload: CreationParent,
+    admin: AdministratifConnecte = Depends(get_administratif_connecte),
+):
+    """Crée un compte parent et le lie à un ou plusieurs élèves existants.
+    Chaque élève doit appartenir au même établissement que l'admin — sinon
+    un admin pourrait lier un parent à un enfant d'une autre école."""
+    with get_cursor(commit=True) as cur:
+        for eleve_id in payload.eleve_ids:
+            cur.execute(
+                """
+                SELECT 1 FROM eleves el
+                JOIN classes c ON c.id = el.classe_id
+                WHERE el.utilisateur_id = %s AND c.etablissement_id = %s
+                """,
+                (eleve_id, admin.etablissement_id),
+            )
+            if cur.fetchone() is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                     detail=f"Élève {eleve_id} introuvable dans votre établissement")
+
+        mot_de_passe = _generer_mot_de_passe_provisoire()
+        try:
+            cur.execute(
+                """
+                INSERT INTO utilisateurs (etablissement_id, role, email, mot_de_passe_hash, nom, prenom)
+                VALUES (%s, 'parent', %s, %s, %s, %s) RETURNING id
+                """,
+                (admin.etablissement_id, payload.email, hacher_mot_de_passe(mot_de_passe),
+                 payload.nom, payload.prenom),
+            )
+            utilisateur_id = cur.fetchone()[0]
+        except psycopg2.errors.UniqueViolation:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                 detail="Un compte existe déjà avec cet email")
+
+        for eleve_id in payload.eleve_ids:
+            cur.execute(
+                "INSERT INTO parents_eleves (parent_id, eleve_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                (utilisateur_id, eleve_id),
+            )
 
     return CompteCree(id=str(utilisateur_id), email=payload.email, mot_de_passe_provisoire=mot_de_passe)
 
