@@ -277,38 +277,76 @@ function ModalCreationEleve({ token, classes, onFerme, onCree }) {
   const [prenom, setPrenom] = useState("");
   const [classeId, setClasseId] = useState(classes[0]?.id || "");
   const [matricule, setMatricule] = useState("");
+  const [ajouterParent, setAjouterParent] = useState(false);
+  const [parentEmail, setParentEmail] = useState("");
+  const [parentNom, setParentNom] = useState("");
+  const [parentPrenom, setParentPrenom] = useState("");
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState(null);
-  const [resultat, setResultat] = useState(null);
+  const [resultatEleve, setResultatEleve] = useState(null);
+  const [resultatParent, setResultatParent] = useState(null);
+  const [erreurParent, setErreurParent] = useState(null);
 
   async function soumettre(e) {
     e.preventDefault();
     setEnvoi(true); setErreur(null);
     try {
-      const r = await apiFetch("/administration/eleves", { method: "POST", token, body: { email, nom, prenom, classe_id: classeId, matricule: matricule || null } });
-      setResultat(r); onCree();
+      const nouvelEleve = await apiFetch("/administration/eleves", {
+        method: "POST", token,
+        body: { email, nom, prenom, classe_id: classeId, matricule: matricule || null },
+      });
+      setResultatEleve(nouvelEleve);
+      onCree();
+
+      // Le compte élève est créé, quoi qu'il arrive ensuite avec le parent —
+      // on ne fait donc jamais dépendre son succès de la création du parent.
+      if (ajouterParent && parentEmail) {
+        try {
+          const nouveauParent = await apiFetch("/administration/parents", {
+            method: "POST", token,
+            body: { email: parentEmail, nom: parentNom, prenom: parentPrenom, eleve_ids: [nouvelEleve.id] },
+          });
+          setResultatParent(nouveauParent);
+        } catch (eParent) {
+          setErreurParent(`Élève créé, mais le compte parent a échoué : ${eParent.message} `
+            + `(vous pourrez réessayer depuis "+ Parent" une fois cette fenêtre fermée).`);
+        }
+      }
     } catch (e) { setErreur(e.message); }
     finally { setEnvoi(false); }
   }
 
   return (
     <div className="fixed inset-0 z-20 flex items-center justify-center px-6" style={{ backgroundColor: "rgba(34,48,74,0.45)" }}>
-      <div className="w-full max-w-sm rounded-2xl p-6 eduai-fade-in" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre }}>
+      <div className="w-full max-w-sm rounded-2xl p-6 eduai-fade-in max-h-[90vh] overflow-y-auto" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre }}>
         <h3 className="eduai-display text-lg mb-4" style={{ color: C.encre }}>Nouvel élève</h3>
-        {resultat ? (
+        {resultatEleve ? (
           <div>
-            <BandeauSucces message="Compte créé." />
-            <p className="text-xs mb-1" style={{ color: C.encreDoux }}>Mot de passe provisoire (à communiquer une seule fois) :</p>
+            <BandeauSucces message="Élève créé." />
+            <p className="text-xs mb-1" style={{ color: C.encreDoux }}>Mot de passe provisoire de l'élève :</p>
             <div className="eduai-mono text-sm rounded-lg px-3 py-2 mb-4 flex items-center justify-between" style={{ backgroundColor: C.fond, color: C.encre }}>
-              {resultat.mot_de_passe_provisoire}
-              <Copy size={13} color={C.encreAttenue} className="cursor-pointer" onClick={() => navigator.clipboard?.writeText(resultat.mot_de_passe_provisoire)} />
+              {resultatEleve.mot_de_passe_provisoire}
+              <Copy size={13} color={C.encreAttenue} className="cursor-pointer" onClick={() => navigator.clipboard?.writeText(resultatEleve.mot_de_passe_provisoire)} />
             </div>
+
+            {resultatParent && (
+              <>
+                <BandeauSucces message="Parent créé et lié à l'élève." />
+                <p className="text-xs mb-1" style={{ color: C.encreDoux }}>Mot de passe provisoire du parent ({resultatParent.email}) :</p>
+                <div className="eduai-mono text-sm rounded-lg px-3 py-2 mb-4 flex items-center justify-between" style={{ backgroundColor: C.fond, color: C.encre }}>
+                  {resultatParent.mot_de_passe_provisoire}
+                  <Copy size={13} color={C.encreAttenue} className="cursor-pointer" onClick={() => navigator.clipboard?.writeText(resultatParent.mot_de_passe_provisoire)} />
+                </div>
+              </>
+            )}
+            {erreurParent && <BandeauErreur message={erreurParent} />}
+
             <button onClick={onFerme} className="eduai-focus w-full rounded-lg py-2.5 text-sm font-semibold" style={{ backgroundColor: C.encre, color: C.surface }}>Fermer</button>
           </div>
         ) : (
           <form onSubmit={soumettre} className="space-y-3">
             <BandeauErreur message={erreur} />
-            <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email"
+            <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email de l'élève"
               className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
             <div className="grid grid-cols-2 gap-2">
               <input required value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom"
@@ -322,6 +360,28 @@ function ModalCreationEleve({ token, classes, onFerme, onCree }) {
             </select>
             <input value={matricule} onChange={(e) => setMatricule(e.target.value)} placeholder="Matricule (optionnel)"
               className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
+
+            <label className="flex items-center gap-2 text-xs pt-1" style={{ color: C.encreDoux }}>
+              <input type="checkbox" checked={ajouterParent} onChange={(e) => setAjouterParent(e.target.checked)} />
+              Inviter aussi un parent, lié à cet élève
+            </label>
+
+            {ajouterParent && (
+              <div className="rounded-lg p-3 border space-y-2" style={{ borderColor: C.ligne, backgroundColor: C.fond }}>
+                <input required={ajouterParent} type="email" value={parentEmail} onChange={(e) => setParentEmail(e.target.value)} placeholder="Email du parent"
+                  className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }} />
+                <div className="grid grid-cols-2 gap-2">
+                  <input required={ajouterParent} value={parentNom} onChange={(e) => setParentNom(e.target.value)} placeholder="Nom du parent"
+                    className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }} />
+                  <input required={ajouterParent} value={parentPrenom} onChange={(e) => setParentPrenom(e.target.value)} placeholder="Prénom du parent"
+                    className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }} />
+                </div>
+                <p className="text-[11px]" style={{ color: C.encreAttenue }}>
+                  Un second parent (ou un parent pour un élève existant) peut être ajouté séparément via "+ Parent".
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-2 pt-1">
               <button type="submit" disabled={envoi} className="eduai-focus flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
                 {envoi && <Loader2 size={12} className="eduai-spin" />} Créer
