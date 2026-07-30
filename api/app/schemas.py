@@ -63,6 +63,7 @@ class ExerciceDisponible(BaseModel):
     l'élève ne l'a pas explicitement révélé — évite de gâcher l'auto-évaluation
     en affichant la réponse dans la même requête que l'énoncé."""
     id: str
+    matiere: str
     theme: str
     sous_theme: str | None
     difficulte: str

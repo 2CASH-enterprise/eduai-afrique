@@ -21,7 +21,7 @@ def lister_exercices_disponibles(
     with get_cursor() as cur:
         cur.execute(
             """
-            SELECT e.id, e.theme, e.sous_theme, e.difficulte, e.enonce, e.contexte, e.tags
+            SELECT e.id, m.nom, e.theme, e.sous_theme, e.difficulte, e.enonce, e.contexte, e.tags
             FROM exercices e
             JOIN matieres m ON m.id = e.matiere_id
             WHERE e.niveau_id = %s AND e.statut = 'valide' AND e.deleted_at IS NULL
@@ -35,9 +35,9 @@ def lister_exercices_disponibles(
         lignes = cur.fetchall()
 
     return [
-        ExerciceDisponible(id=str(id_), theme=theme, sous_theme=sous_theme, difficulte=difficulte,
-                            enonce=enonce, contexte=contexte, tags=tags or [])
-        for id_, theme, sous_theme, difficulte, enonce, contexte, tags in lignes
+        ExerciceDisponible(id=str(id_), matiere=matiere_nom, theme=theme, sous_theme=sous_theme,
+                            difficulte=difficulte, enonce=enonce, contexte=contexte, tags=tags or [])
+        for id_, matiere_nom, theme, sous_theme, difficulte, enonce, contexte, tags in lignes
     ]
 
 
