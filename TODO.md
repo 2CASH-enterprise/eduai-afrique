@@ -82,15 +82,26 @@ scolaire, sans dépendre de nous.
 
 ---
 
-## 4. "Version en ligne" de l'application
+## 4. Version hors-ligne de l'application (correction du 31/07 : ce n'est PAS "en ligne")
 
-**Besoin exprimé** : pas encore clarifié précisément — la question a été
-posée mais pas encore répondue. L'app tourne déjà en ligne sur le VPS
-(`89.116.111.3`), donc il s'agit probablement de l'une de ces pistes,
-à confirmer à la prochaine session :
-- un vrai nom de domaine + HTTPS (au lieu de l'IP:port actuelle) ;
-- une version mobile / installable (PWA) ;
-- autre chose.
+**Besoin exprimé, précisé** : pas une question de nom de domaine ou de
+HTTPS — le vrai besoin est une **version qui fonctionne sans connexion
+internet**, parce que les utilisateurs se trouvent parfois dans des zones
+sans accès réseau. Un vrai chantier de fond, pas un réglage rapide.
+
+**Implications techniques à explorer (pas encore creusées)** :
+- Passage en PWA (progressive web app) avec service worker, pour permettre
+  le chargement de l'app elle-même sans réseau.
+- Stratégie de cache/stockage local (exercices déjà chargés, cours
+  consultés...) pour un usage minimal hors-ligne.
+- Question centrale à trancher : quelles actions doivent rester possibles
+  hors-ligne (consulter un exercice déjà chargé, répondre à un exercice ?)
+  et lesquelles nécessitent forcément une connexion (génération IA,
+  connexion initiale, synchronisation des notes) ?
+- Stratégie de synchronisation au retour de la connexion (ex : réponses
+  données hors-ligne, à synchroniser ensuite).
+- Discussion produit à avoir avant de coder quoi que ce soit : le périmètre
+  hors-ligne réaliste pour une V1 (probablement partiel, pas l'app entière).
 
 ---
 
@@ -121,6 +132,36 @@ vérifier immédiatement (via un appel léger, ex. le premier chargement de
 données du module) que le compte correspond bien au bon rôle, et afficher
 "Ce compte n'a pas accès à cet espace" plutôt que de laisser entrer sur un
 écran cassé.
+
+---
+
+## 7. Brancher réellement la recherche RAG sur la génération de cours/exercices
+
+`rag.rechercher_passages_pertinents` existe et est testée (voir la session
+du corpus documentaire), mais n'est encore appelée nulle part dans le code
+de génération réel (pipeline Maths/PC par templates, génération LLM
+Mistral pour Français/SVT/HG). Tant que ce branchement n'est pas fait, tout
+le travail du corpus documentaire (programmes officiels, notes de cours,
+réinjection du contenu validé) n'a aucun effet concret sur ce que l'IA
+génère.
+
+---
+
+## 8. CI/CD — déploiement automatique à chaque push
+
+Mentionné plusieurs fois au fil des sessions comme prochaine étape
+logique, jamais commencé. Objectif : GitHub Actions (ou équivalent) pour
+automatiser ce qui est fait à la main aujourd'hui à chaque déploiement
+(scp, extraction, migration, redémarrage des services).
+
+---
+
+## 9. Déposer les vrais programmes officiels MINESEC
+
+Une fois récupérés par l'utilisateur (le site du MINESEC bloque l'accès
+automatisé), à déposer via le module Admin Plateforme
+(`POST /plateforme/documents`). Pas un chantier technique — juste une
+tâche opérationnelle en attente du matériel source.
 
 ---
 
