@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from .routers import auth, exercices, eleve, direction, administration, parent, cours, classes, etablissement, bulletins_pdf, documents, documents_enseignant
+from .routers import auth, exercices, eleve, direction, administration, parent, cours, classes, etablissement, bulletins_pdf, documents, documents_enseignant, plateforme
 
 app = FastAPI(
     title="ÉduAI Afrique — API",
@@ -46,6 +46,7 @@ app.include_router(etablissement.router)
 app.include_router(bulletins_pdf.router)
 app.include_router(documents.router)
 app.include_router(documents_enseignant.router)
+app.include_router(plateforme.router)
 
 
 @app.get("/healthz")

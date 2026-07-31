@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordBearer
 
 from .db import get_cursor
 from .security import decoder_token
-from .schemas import EnseignantConnecte, EleveConnecte, DirectionConnecte, AdministratifConnecte, ParentConnecte
+from .schemas import EnseignantConnecte, EleveConnecte, DirectionConnecte, AdministratifConnecte, ParentConnecte, AdminPlateformeConnecte
 
 _oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -122,6 +122,33 @@ def get_administratif_connecte(token: str = Depends(_oauth2_scheme)) -> Administ
         raise erreur_auth
 
     return AdministratifConnecte(id=str(row[0]), nom=row[1], prenom=row[2], etablissement_id=str(row[3]))
+
+
+def get_admin_plateforme_connecte(token: str = Depends(_oauth2_scheme)) -> AdminPlateformeConnecte:
+    erreur_auth = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Identifiants invalides ou expirés",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        utilisateur_id = decoder_token(token)
+    except jwt.PyJWTError:
+        raise erreur_auth
+
+    with get_cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, nom, prenom FROM utilisateurs
+            WHERE id = %s AND role = 'admin_plateforme' AND actif = true AND deleted_at IS NULL
+            """,
+            (utilisateur_id,),
+        )
+        row = cur.fetchone()
+
+    if row is None:
+        raise erreur_auth
+
+    return AdminPlateformeConnecte(id=str(row[0]), nom=row[1], prenom=row[2])
 
 
 def get_parent_connecte(token: str = Depends(_oauth2_scheme)) -> ParentConnecte:

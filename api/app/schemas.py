@@ -171,6 +171,15 @@ class AdministratifConnecte(BaseModel):
     etablissement_id: str
 
 
+class AdminPlateformeConnecte(BaseModel):
+    id: str
+    nom: str
+    prenom: str
+    # Pas d'etablissement_id : par construction, un admin plateforme n'est
+    # rattaché à aucun établissement en particulier — il supervise toute
+    # la plateforme (voir utilisateurs.etablissement_id, nullable pour ce rôle).
+
+
 class CreationEleve(BaseModel):
     email: str
     nom: str
@@ -508,3 +517,50 @@ class ExerciceValide(BaseModel):
     statut: str
     valide_par_id: str
     date_validation: datetime
+
+
+# ---------------------------------------------------------------------------
+# Admin Plateforme
+# ---------------------------------------------------------------------------
+
+class EtablissementResume(BaseModel):
+    id: str
+    nom: str
+    pays: str
+    ville: str | None
+    niveau_abonnement: str
+    actif: bool
+    created_at: datetime
+    nombre_utilisateurs: int
+    nombre_eleves: int
+
+
+class CreationEtablissement(BaseModel):
+    nom: str
+    pays: str
+    ville: str | None = None
+    email_contact: str | None = None
+    telephone_contact: str | None = None
+    niveau_abonnement: str = "starter"
+    # Premier compte administratif de l'établissement, créé dans la même
+    # opération — sans lui, personne ne pourrait se connecter pour gérer
+    # la nouvelle école une fois créée.
+    admin_email: str
+    admin_nom: str
+    admin_prenom: str
+
+
+class EtablissementCree(BaseModel):
+    etablissement: EtablissementResume
+    compte_admin: CompteCree
+
+
+class ExerciceBiblioCommune(BaseModel):
+    id: str
+    niveau: str
+    matiere: str
+    theme: str
+    difficulte: str
+    statut: str
+    source: str
+    created_at: datetime
