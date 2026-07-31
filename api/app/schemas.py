@@ -465,6 +465,23 @@ class CreationChapitre(BaseModel):
     ordre: int = 0
 
 
+class DocumentPedagogique(BaseModel):
+    id: str
+    type_document: str
+    niveau: str | None
+    matiere: str | None
+    titre: str
+    nombre_pages: int | None
+    statut: str
+    erreur_traitement: str | None
+    nombre_passages: int
+
+
+class PassageRecherche(BaseModel):
+    extrait: str
+    similarite: float
+
+
 class ResultatLigneImport(BaseModel):
     ligne: int
     email: str | None

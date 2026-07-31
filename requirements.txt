@@ -8,6 +8,7 @@ python-multipart
 openpyxl
 reportlab
 Pillow
+pypdf
 
 # Pipeline de génération d'exercices
 sympy

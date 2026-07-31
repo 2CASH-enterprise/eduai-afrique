@@ -399,6 +399,44 @@ CREATE TABLE notifications (
 CREATE INDEX idx_notifications_utilisateur ON notifications(utilisateur_id, lue);
 
 -- ============================================================================
+-- 7b. BASE DOCUMENTAIRE (RAG) — alimente la génération IA, jamais partagée
+-- ============================================================================
+-- Voir migrations/002_base_documentaire.sql pour le commentaire complet sur
+-- la politique de contenu (documents publics ou rédigés par l'établissement
+-- uniquement — jamais de manuel scolaire commercial scanné).
+
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE documents_pedagogiques (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    etablissement_id    UUID NOT NULL REFERENCES etablissements(id) ON DELETE CASCADE,
+    depose_par_id       UUID REFERENCES utilisateurs(id),
+    type_document        TEXT NOT NULL DEFAULT 'notes_cours'
+                        CHECK (type_document IN ('programme_officiel', 'notes_cours')),
+    niveau_id           UUID REFERENCES niveaux(id),
+    matiere_id          UUID REFERENCES matieres(id),
+    titre               TEXT NOT NULL,
+    nombre_pages        INTEGER,
+    statut              TEXT NOT NULL DEFAULT 'en_traitement'
+                        CHECK (statut IN ('en_traitement', 'indexe', 'erreur')),
+    erreur_traitement   TEXT,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_documents_etablissement ON documents_pedagogiques(etablissement_id);
+CREATE INDEX idx_documents_niveau_matiere ON documents_pedagogiques(niveau_id, matiere_id);
+
+CREATE TABLE passages_documents (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_id         UUID NOT NULL REFERENCES documents_pedagogiques(id) ON DELETE CASCADE,
+    ordre               INTEGER NOT NULL,
+    contenu             TEXT NOT NULL,
+    embedding           vector(1024)
+);
+CREATE INDEX idx_passages_document ON passages_documents(document_id);
+CREATE INDEX idx_passages_embedding ON passages_documents
+    USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+
+-- ============================================================================
 -- 8. USAGE / QUOTAS IA (pilotage des coûts Mistral par établissement)
 -- ============================================================================
 
