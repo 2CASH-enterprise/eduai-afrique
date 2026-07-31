@@ -162,6 +162,7 @@ function BarreNav({ vue, setVue, onDeconnexion }) {
     { id: "bulletins", label: "Bulletins" },
     { id: "notifications", label: "Notifications" },
     { id: "paiements", label: "Paiements" },
+    { id: "etablissement", label: "Établissement" },
   ];
   return (
     <div className="sticky top-0 z-10 px-4 sm:px-8 py-3.5 flex items-center justify-between border-b flex-wrap gap-y-2"
@@ -591,6 +592,26 @@ function telechargerCSV(nomFichier, contenu) {
   URL.revokeObjectURL(url);
 }
 
+async function telechargerBulletinPdf(token, bulletinId, nomEleve) {
+  // Téléchargement via fetch (pas un <a href> direct) car l'endpoint est
+  // protégé par un token — un lien classique n'enverrait pas le header
+  // Authorization, la requête serait rejetée en 401.
+  try {
+    const reponse = await fetch(`${API_BASE_URL}/administration/bulletins/${bulletinId}/pdf`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!reponse.ok) throw new Error(`Échec du téléchargement (${reponse.status})`);
+    const blob = await reponse.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `bulletin_${nomEleve.replace(/\s+/g, "_")}.pdf`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert(`Impossible de télécharger le bulletin : ${e.message}`);
+  }
+}
+
 const MODELE_ELEVES = "email,nom,prenom,classe,matricule\nexemple.eleve@ecole.cm,Dupont,Jean,6ème A,MAT001\n";
 const MODELE_ENSEIGNANTS = "email,nom,prenom,specialite,affectations\nexemple.prof@ecole.cm,Nguema,Sophie,Mathématiques,\"6ème A:Mathématiques;6ème B:Mathématiques\"\n";
 
@@ -765,6 +786,13 @@ function EcranBulletins({ token, classes }) {
               <div className="flex items-center gap-3">
                 <span className="text-xs" style={{ color: C.encreDoux }}>{b.rang_classe ? `Rang ${b.rang_classe}` : "—"}</span>
                 <span className="eduai-mono text-sm font-bold" style={{ color: C.accentFonce }}>{b.moyenne_generale === null ? "—" : `${b.moyenne_generale}/20`}</span>
+                <button
+                  onClick={() => telechargerBulletinPdf(token, b.id, b.eleve_nom)}
+                  className="eduai-focus flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full"
+                  style={{ backgroundColor: C.bleuFond, color: C.encre }}
+                >
+                  <Download size={11} /> PDF
+                </button>
               </div>
             </div>
           ))}
@@ -905,6 +933,296 @@ function EcranPaiements({ token }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Écran : Paramétrage de l'établissement                              */
+/* ------------------------------------------------------------------ */
+
+function EcranEtablissement({ token, classes, matieres }) {
+  const [etab, setEtab] = useState(null);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+  const [succes, setSucces] = useState(null);
+
+  const [nomEdite, setNomEdite] = useState("");
+  const [enEditionNom, setEnEditionNom] = useState(false);
+  const [envoiNom, setEnvoiNom] = useState(false);
+
+  const [envoiLogo, setEnvoiLogo] = useState(false);
+  const [envoiReglement, setEnvoiReglement] = useState(false);
+
+  const [referentiels, setReferentiels] = useState([]);
+  const [chargementRef, setChargementRef] = useState(true);
+  const [referentielOuvert, setReferentielOuvert] = useState(null);
+
+  const charger = useCallback(() => {
+    setChargement(true); setErreur(null);
+    apiFetch("/administration/etablissement", { token })
+      .then((d) => { setEtab(d); setNomEdite(d.nom); })
+      .catch((e) => setErreur(e.message)).finally(() => setChargement(false));
+  }, [token]);
+
+  const chargerReferentiels = useCallback(() => {
+    setChargementRef(true);
+    apiFetch("/administration/etablissement/referentiels", { token })
+      .then(setReferentiels).catch(() => {}).finally(() => setChargementRef(false));
+  }, [token]);
+
+  useEffect(() => { charger(); chargerReferentiels(); }, [charger, chargerReferentiels]);
+
+  async function enregistrerNom() {
+    setEnvoiNom(true); setErreur(null);
+    try {
+      const r = await apiFetch("/administration/etablissement", { method: "PATCH", token, body: { nom: nomEdite } });
+      setEtab(r); setEnEditionNom(false); setSucces("Nom mis à jour.");
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoiNom(false); }
+  }
+
+  async function envoyerLogo(fichier) {
+    if (!fichier) return;
+    setEnvoiLogo(true); setErreur(null);
+    try {
+      const formData = new FormData();
+      formData.append("fichier", fichier);
+      const r = await apiFetch("/administration/etablissement/logo", { method: "POST", token, body: formData });
+      setEtab(r); setSucces("Logo mis à jour.");
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoiLogo(false); }
+  }
+
+  async function envoyerReglement(fichier) {
+    if (!fichier) return;
+    setEnvoiReglement(true); setErreur(null);
+    try {
+      const formData = new FormData();
+      formData.append("fichier", fichier);
+      const r = await apiFetch("/administration/etablissement/reglement", { method: "POST", token, body: formData });
+      setEtab(r); setSucces("Règlement mis à jour.");
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoiReglement(false); }
+  }
+
+  if (chargement) return <div className="max-w-3xl mx-auto px-4 sm:px-8 py-10"><Chargement label="Chargement..." /></div>;
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
+      <h1 className="eduai-display text-3xl mb-8" style={{ color: C.encre }}>Établissement</h1>
+
+      <BandeauErreur message={erreur} />
+      <BandeauSucces message={succes} />
+
+      {/* Informations générales */}
+      <div className="rounded-2xl p-6 border mb-6" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+        <h2 className="eduai-display text-lg mb-4" style={{ color: C.encre }}>Informations générales</h2>
+
+        <div className="flex items-center gap-4 mb-5">
+          <div className="w-16 h-16 rounded-xl border flex items-center justify-center overflow-hidden flex-shrink-0" style={{ borderColor: C.ligne, backgroundColor: C.fond }}>
+            {etab.logo_url ? (
+              <img src={`${API_BASE_URL}${etab.logo_url}`} alt="Logo" className="w-full h-full object-contain" />
+            ) : (
+              <GraduationCap size={22} color={C.encreAttenue} />
+            )}
+          </div>
+          <label className="eduai-focus flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium border cursor-pointer" style={{ borderColor: C.ligne, color: C.encre }}>
+            {envoiLogo ? <Loader2 size={12} className="eduai-spin" /> : <Upload size={12} />}
+            {envoiLogo ? "Envoi..." : "Changer le logo"}
+            <input type="file" accept="image/*" className="hidden" disabled={envoiLogo} onChange={(e) => envoyerLogo(e.target.files[0])} />
+          </label>
+        </div>
+
+        <label className="block mb-1">
+          <span className="text-xs font-medium mb-1 block" style={{ color: C.encreDoux }}>Nom de l'établissement</span>
+          {enEditionNom ? (
+            <div className="flex gap-2">
+              <input value={nomEdite} onChange={(e) => setNomEdite(e.target.value)}
+                className="eduai-focus flex-1 rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.accent, backgroundColor: C.fond, color: C.encre }} />
+              <button onClick={enregistrerNom} disabled={envoiNom} className="eduai-focus rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
+                {envoiNom ? <Loader2 size={12} className="eduai-spin" /> : "Enregistrer"}
+              </button>
+              <button onClick={() => { setEnEditionNom(false); setNomEdite(etab.nom); }} className="eduai-focus text-xs font-medium" style={{ color: C.encreDoux }}>Annuler</button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between rounded-lg px-3 py-2 border" style={{ borderColor: C.ligne, backgroundColor: C.fond }}>
+              <span className="text-sm" style={{ color: C.encre }}>{etab.nom}</span>
+              <button onClick={() => setEnEditionNom(true)} className="eduai-focus text-xs font-medium" style={{ color: C.accentFonce }}>Modifier</button>
+            </div>
+          )}
+        </label>
+      </div>
+
+      {/* Règlement intérieur */}
+      <div className="rounded-2xl p-6 border mb-6" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+        <h2 className="eduai-display text-lg mb-4" style={{ color: C.encre }}>Règlement intérieur</h2>
+        <div className="flex items-center justify-between">
+          {etab.reglement_url ? (
+            <a href={`${API_BASE_URL}${etab.reglement_url}`} target="_blank" rel="noreferrer"
+              className="eduai-focus text-sm font-medium flex items-center gap-1.5" style={{ color: C.accentFonce }}>
+              <ScrollText size={14} /> Voir le règlement actuel (PDF)
+            </a>
+          ) : (
+            <span className="text-sm" style={{ color: C.encreDoux }}>Aucun règlement déposé.</span>
+          )}
+          <label className="eduai-focus flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium border cursor-pointer" style={{ borderColor: C.ligne, color: C.encre }}>
+            {envoiReglement ? <Loader2 size={12} className="eduai-spin" /> : <Upload size={12} />}
+            {envoiReglement ? "Envoi..." : "Déposer un PDF"}
+            <input type="file" accept="application/pdf" className="hidden" disabled={envoiReglement} onChange={(e) => envoyerReglement(e.target.files[0])} />
+          </label>
+        </div>
+      </div>
+
+      {/* Programme pédagogique */}
+      <div className="rounded-2xl p-6 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+        <h2 className="eduai-display text-lg mb-4" style={{ color: C.encre }}>Programme pédagogique</h2>
+
+        <FormulaireReferentiel token={token} classes={classes} matieres={matieres} onCree={chargerReferentiels} />
+
+        {chargementRef ? <Chargement /> : (
+          <div className="space-y-2.5 mt-5">
+            {referentiels.map((r) => (
+              <div key={r.id} className="rounded-lg border" style={{ borderColor: C.ligne }}>
+                <button
+                  onClick={() => setReferentielOuvert(referentielOuvert === r.id ? null : r.id)}
+                  className="eduai-focus w-full text-left px-4 py-3 flex items-center justify-between"
+                >
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: C.encre }}>{r.niveau} · {r.matiere}</p>
+                    <p className="text-xs mt-0.5" style={{ color: C.encreDoux }}>{r.programme_officiel}{r.manuel_titre ? ` — ${r.manuel_titre}` : ""}</p>
+                  </div>
+                  <ChevronRight size={14} color={C.encreAttenue} style={{ transform: referentielOuvert === r.id ? "rotate(90deg)" : "none" }} />
+                </button>
+                {referentielOuvert === r.id && <CalendrierReferentiel token={token} referentielId={r.id} />}
+              </div>
+            ))}
+            {referentiels.length === 0 && <p className="text-sm" style={{ color: C.encreDoux }}>Aucun programme défini pour l'instant.</p>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FormulaireReferentiel({ token, classes, matieres, onCree }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [niveauId, setNiveauId] = useState("");
+  const [matiereId, setMatiereId] = useState(matieres[0]?.id || "");
+  const [programme, setProgramme] = useState("");
+  const [manuelTitre, setManuelTitre] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState(null);
+
+  // Niveaux distincts déduits des classes de l'établissement (pas d'endpoint
+  // dédié /niveaux — les classes en portent déjà l'information nécessaire).
+  const niveaux = [...new Map(classes.map((c) => [c.niveau_id, c.niveau])).entries()];
+
+  async function soumettre(e) {
+    e.preventDefault();
+    setEnvoi(true); setErreur(null);
+    try {
+      await apiFetch("/administration/etablissement/referentiels", {
+        method: "POST", token,
+        body: { niveau_id: niveauId, matiere_id: matiereId, programme_officiel: programme, manuel_titre: manuelTitre || null },
+      });
+      setProgramme(""); setManuelTitre(""); setOuvert(false);
+      onCree();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoi(false); }
+  }
+
+  if (!ouvert) {
+    return (
+      <button onClick={() => setOuvert(true)} className="eduai-focus flex items-center gap-1.5 text-xs font-medium" style={{ color: C.accentFonce }}>
+        <Plus size={13} /> Ajouter un programme (niveau + matière)
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={soumettre} className="rounded-lg p-4 border space-y-2.5" style={{ borderColor: C.ligne, backgroundColor: C.fond }}>
+      <BandeauErreur message={erreur} />
+      <div className="grid grid-cols-2 gap-2">
+        <select required value={niveauId} onChange={(e) => setNiveauId(e.target.value)} className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }}>
+          <option value="">Niveau...</option>
+          {niveaux.map(([id, nom]) => <option key={id} value={id}>{nom}</option>)}
+        </select>
+        <select value={matiereId} onChange={(e) => setMatiereId(e.target.value)} className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }}>
+          {matieres.map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
+        </select>
+      </div>
+      <input required value={programme} onChange={(e) => setProgramme(e.target.value)} placeholder="Programme officiel (ex : Programme Cameroun 2026-2027)"
+        className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }} />
+      <input value={manuelTitre} onChange={(e) => setManuelTitre(e.target.value)} placeholder="Manuel utilisé (optionnel)"
+        className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }} />
+      <div className="flex gap-2">
+        <button type="submit" disabled={envoi} className="eduai-focus rounded-lg px-3.5 py-2 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
+          {envoi ? <Loader2 size={12} className="eduai-spin" /> : "Ajouter"}
+        </button>
+        <button type="button" onClick={() => setOuvert(false)} className="eduai-focus text-xs font-medium" style={{ color: C.encreDoux }}>Annuler</button>
+      </div>
+    </form>
+  );
+}
+
+function CalendrierReferentiel({ token, referentielId }) {
+  const [chapitres, setChapitres] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [ouvert, setOuvert] = useState(false);
+  const [mois, setMois] = useState("");
+  const [titre, setTitre] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+
+  const charger = useCallback(() => {
+    setChargement(true);
+    apiFetch(`/administration/etablissement/referentiels/${referentielId}/calendrier`, { token })
+      .then(setChapitres).catch(() => {}).finally(() => setChargement(false));
+  }, [referentielId, token]);
+
+  useEffect(() => { charger(); }, [charger]);
+
+  async function ajouter(e) {
+    e.preventDefault();
+    setEnvoi(true);
+    try {
+      await apiFetch("/administration/etablissement/calendrier", {
+        method: "POST", token, body: { referentiel_id: referentielId, mois, chapitre_titre: titre, competences: [], ordre: chapitres.length },
+      });
+      setMois(""); setTitre(""); setOuvert(false); charger();
+    } catch { /* affiché nulle part pour l'instant, mais n'empêche pas de réessayer */ }
+    finally { setEnvoi(false); }
+  }
+
+  return (
+    <div className="px-4 pb-4 border-t" style={{ borderColor: C.ligne }}>
+      {chargement ? <Chargement /> : (
+        <div className="space-y-1.5 mt-3 mb-3">
+          {chapitres.map((c) => (
+            <div key={c.id} className="flex items-center justify-between text-xs">
+              <span style={{ color: C.encre }}>{c.chapitre_titre}</span>
+              <span className="eduai-mono" style={{ color: C.encreAttenue }}>{new Date(c.mois).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}</span>
+            </div>
+          ))}
+          {chapitres.length === 0 && <p className="text-xs" style={{ color: C.encreAttenue }}>Aucun chapitre planifié.</p>}
+        </div>
+      )}
+
+      {ouvert ? (
+        <form onSubmit={ajouter} className="flex gap-2 items-center">
+          <input required type="month" value={mois} onChange={(e) => setMois(e.target.value + "-01")}
+            className="eduai-focus rounded-lg px-2 py-1.5 text-xs outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }} />
+          <input required value={titre} onChange={(e) => setTitre(e.target.value)} placeholder="Titre du chapitre"
+            className="eduai-focus flex-1 rounded-lg px-2 py-1.5 text-xs outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }} />
+          <button type="submit" disabled={envoi} className="eduai-focus rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
+            {envoi ? <Loader2 size={11} className="eduai-spin" /> : "+"}
+          </button>
+        </form>
+      ) : (
+        <button onClick={() => setOuvert(true)} className="eduai-focus flex items-center gap-1 text-xs font-medium" style={{ color: C.accentFonce }}>
+          <Plus size={11} /> Ajouter un chapitre
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Application                                                        */
 /* ------------------------------------------------------------------ */
 
@@ -945,6 +1263,7 @@ export default function EspaceAdministration() {
           {vue === "bulletins" && <EcranBulletins token={token} classes={classes} />}
           {vue === "notifications" && <EcranNotificationsDiffusion token={token} classes={classes} />}
           {vue === "paiements" && <EcranPaiements token={token} />}
+          {vue === "etablissement" && <EcranEtablissement token={token} classes={classes} matieres={matieres} />}
         </>
       )}
     </div>

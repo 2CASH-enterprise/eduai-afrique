@@ -6,6 +6,8 @@ bcrypt
 pyjwt
 python-multipart
 openpyxl
+reportlab
+Pillow
 
 # Pipeline de génération d'exercices
 sympy

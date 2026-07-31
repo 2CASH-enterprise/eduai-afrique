@@ -15,6 +15,10 @@ venv/
 *.sqlite3
 *.db
 
+# Fichiers uploadés par les utilisateurs (logos, règlements...) — jamais
+# dans le dépôt, propres à chaque déploiement
+api/uploads/
+
 # Éditeurs / OS
 .vscode/
 .idea/

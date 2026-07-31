@@ -212,6 +212,7 @@ class GenerationBulletins(BaseModel):
 
 
 class BulletinGenere(BaseModel):
+    id: str
     eleve_id: str
     eleve_nom: str
     moyenne_generale: float | None
@@ -411,6 +412,57 @@ class CreationParent(BaseModel):
     nom: str
     prenom: str
     eleve_ids: list[str] = Field(..., min_length=1, description="Au moins un enfant à lier")
+
+
+class EtablissementInfo(BaseModel):
+    id: str
+    nom: str
+    pays: str
+    ville: str | None
+    logo_url: str | None
+    reglement_url: str | None
+
+
+class ModificationEtablissement(BaseModel):
+    nom: str | None = None
+    ville: str | None = None
+
+
+class ReferentielPedagogique(BaseModel):
+    id: str
+    niveau_id: str
+    niveau: str
+    matiere_id: str
+    matiere: str
+    programme_officiel: str
+    manuel_titre: str | None
+    manuel_editeur: str | None
+    manuel_edition: str | None
+
+
+class CreationReferentiel(BaseModel):
+    niveau_id: str
+    matiere_id: str
+    programme_officiel: str
+    manuel_titre: str | None = None
+    manuel_editeur: str | None = None
+    manuel_edition: str | None = None
+
+
+class ChapitreCalendrier(BaseModel):
+    id: str
+    mois: str
+    chapitre_titre: str
+    competences: list[str]
+    ordre: int
+
+
+class CreationChapitre(BaseModel):
+    referentiel_id: str
+    mois: str  # 'YYYY-MM-DD' (premier jour du mois)
+    chapitre_titre: str
+    competences: list[str] = Field(default_factory=list)
+    ordre: int = 0
 
 
 class ResultatLigneImport(BaseModel):

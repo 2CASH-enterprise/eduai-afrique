@@ -33,6 +33,7 @@ CREATE TABLE etablissements (
     ville               TEXT,
     devise              TEXT NOT NULL DEFAULT 'FCFA',
     logo_url            TEXT,
+    reglement_url       TEXT,                         -- PDF du règlement intérieur
     email_contact       TEXT,
     telephone_contact   TEXT,
     niveau_abonnement   TEXT NOT NULL DEFAULT 'starter'

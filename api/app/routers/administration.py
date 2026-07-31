@@ -318,12 +318,14 @@ def generer_bulletins(
                 ON CONFLICT (eleve_id, annee_scolaire_id, trimestre)
                 DO UPDATE SET moyenne_generale = EXCLUDED.moyenne_generale,
                               rang_classe = EXCLUDED.rang_classe, genere_le = now()
+                RETURNING id
                 """,
                 (eleve_id, annee_scolaire_id, payload.trimestre,
                  round(float(moyenne), 2) if moyenne is not None else None, rang),
             )
+            bulletin_id = cur.fetchone()[0]
             resultats.append(BulletinGenere(
-                eleve_id=str(eleve_id), eleve_nom=nom_complet,
+                id=str(bulletin_id), eleve_id=str(eleve_id), eleve_nom=nom_complet,
                 moyenne_generale=round(float(moyenne), 2) if moyenne is not None else None,
                 rang_classe=rang,
             ))
