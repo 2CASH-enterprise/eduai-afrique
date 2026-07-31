@@ -496,5 +496,21 @@ WHERE e.validation_humaine = false
   AND e.deleted_at IS NULL;
 
 -- ============================================================================
+-- Droits pour l'utilisateur applicatif (eduai_app)
+-- ============================================================================
+-- Sur une installation neuve, ce script est généralement appliqué par le
+-- superutilisateur postgres, alors que l'API se connecte avec un utilisateur
+-- applicatif dédié (eduai_app, créé séparément). Sans ce réglage, chaque
+-- nouvelle table créée par une future migration (elle aussi exécutée par
+-- postgres) resterait inaccessible à l'API tant qu'on n'y pense pas
+-- explicitement — voir l'incident du 31/07/2026 (migration 004).
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO eduai_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO eduai_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO eduai_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+    GRANT USAGE, SELECT ON SEQUENCES TO eduai_app;
+
+-- ============================================================================
 -- FIN DU SCHÉMA V1
 -- ============================================================================
