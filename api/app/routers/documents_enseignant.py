@@ -77,7 +77,8 @@ def lister_mes_notes_cours(enseignant: EnseignantConnecte = Depends(get_enseigna
         cur.execute(
             """
             SELECT d.id, d.type_document, n.nom, m.nom, d.titre, d.nombre_pages, d.statut, d.erreur_traitement,
-                   (SELECT COUNT(*) FROM passages_documents p WHERE p.document_id = d.id)
+                   (SELECT COUNT(*) FROM passages_documents p WHERE p.document_id = d.id),
+                   (d.depose_par_id = %s) AS est_proprietaire
             FROM documents_pedagogiques d
             LEFT JOIN niveaux n ON n.id = d.niveau_id
             LEFT JOIN matieres m ON m.id = d.matiere_id
@@ -88,12 +89,13 @@ def lister_mes_notes_cours(enseignant: EnseignantConnecte = Depends(get_enseigna
                   )
             ORDER BY d.created_at DESC
             """,
-            (enseignant.id, enseignant.id),
+            (enseignant.id, enseignant.id, enseignant.id),
         )
         lignes = cur.fetchall()
     return [DocumentPedagogique(id=str(id_), type_document=t, niveau=n, matiere=m, titre=titre,
-                                  nombre_pages=np, statut=s, erreur_traitement=e, nombre_passages=npass)
-            for id_, t, n, m, titre, np, s, e, npass in lignes]
+                                  nombre_pages=np, statut=s, erreur_traitement=e, nombre_passages=npass,
+                                  est_proprietaire=bool(prop))
+            for id_, t, n, m, titre, np, s, e, npass, prop in lignes]
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -122,6 +124,32 @@ def lister_collegues(enseignant: EnseignantConnecte = Depends(get_enseignant_con
             ORDER BY u.nom
             """,
             (enseignant.etablissement_id, enseignant.id),
+        )
+        lignes = cur.fetchall()
+    return [CollegueResume(id=str(id_), nom=nom, prenom=prenom) for id_, nom, prenom in lignes]
+
+
+@router.get("/{document_id}/partages", response_model=list[CollegueResume])
+def lister_partages(document_id: str, enseignant: EnseignantConnecte = Depends(get_enseignant_connecte)):
+    """Avec qui ce document est déjà partagé — pour afficher/révoquer depuis
+    l'écran. Réservé à l'auteur du document."""
+    with get_cursor() as cur:
+        cur.execute(
+            "SELECT 1 FROM documents_pedagogiques WHERE id = %s AND depose_par_id = %s",
+            (document_id, enseignant.id),
+        )
+        if cur.fetchone() is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                 detail="Document introuvable, ou vous n'en êtes pas l'auteur")
+        cur.execute(
+            """
+            SELECT u.id, u.nom, u.prenom
+            FROM documents_partages dp
+            JOIN utilisateurs u ON u.id = dp.partage_avec_id
+            WHERE dp.document_id = %s
+            ORDER BY u.nom
+            """,
+            (document_id,),
         )
         lignes = cur.fetchall()
     return [CollegueResume(id=str(id_), nom=nom, prenom=prenom) for id_, nom, prenom in lignes]

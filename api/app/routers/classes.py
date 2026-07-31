@@ -34,7 +34,7 @@ def mes_classes(enseignant: EnseignantConnecte = Depends(get_enseignant_connecte
     with get_cursor() as cur:
         cur.execute(
             """
-            SELECT c.id, ae.matiere_id, c.nom, n.nom, m.nom,
+            SELECT c.id, ae.matiere_id, c.nom, n.id, n.nom, m.nom,
                    COUNT(DISTINCT el.utilisateur_id) AS effectif
             FROM affectations_enseignants ae
             JOIN classes c ON c.id = ae.classe_id
@@ -42,7 +42,7 @@ def mes_classes(enseignant: EnseignantConnecte = Depends(get_enseignant_connecte
             JOIN matieres m ON m.id = ae.matiere_id
             LEFT JOIN eleves el ON el.classe_id = c.id
             WHERE ae.enseignant_id = %s
-            GROUP BY c.id, ae.matiere_id, c.nom, n.nom, m.nom, n.ordre
+            GROUP BY c.id, ae.matiere_id, c.nom, n.id, n.nom, m.nom, n.ordre
             ORDER BY n.ordre, c.nom
             """,
             (enseignant.id,),
@@ -50,7 +50,7 @@ def mes_classes(enseignant: EnseignantConnecte = Depends(get_enseignant_connecte
         lignes = cur.fetchall()
 
         resultats = []
-        for classe_id, matiere_id, nom, niveau, matiere, effectif in lignes:
+        for classe_id, matiere_id, nom, niveau_id, niveau, matiere, effectif in lignes:
             cur.execute(
                 """
                 SELECT AVG(no.valeur / no.bareme * 20)
@@ -62,7 +62,8 @@ def mes_classes(enseignant: EnseignantConnecte = Depends(get_enseignant_connecte
             )
             moyenne = cur.fetchone()[0]
             resultats.append(ClasseEnseignant(
-                classe_id=str(classe_id), matiere_id=str(matiere_id), nom=nom, niveau=niveau,
+                classe_id=str(classe_id), matiere_id=str(matiere_id), nom=nom,
+                niveau_id=str(niveau_id), niveau=niveau,
                 matiere=matiere, effectif=effectif,
                 moyenne_classe=round(float(moyenne), 2) if moyenne is not None else None,
             ))

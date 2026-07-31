@@ -7,7 +7,7 @@ import {
   Calculator, FlaskConical, Leaf, Landmark, Languages, Clock, History,
   FileText, Wand2, Sparkles, Trash2, Plus, BookMarked,
   ListChecks, HelpCircle, NotebookPen, ScrollText, Loader2,
-  Users, TrendingUp, CalendarX, AlertTriangle,
+  Users, TrendingUp, CalendarX, AlertTriangle, Upload, Share2, UserPlus,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -29,15 +29,19 @@ async function apiFetch(path, { method = "GET", token, body, params } = {}) {
     if (qs) url += `?${qs}`;
   }
 
+  const estFormData = typeof FormData !== "undefined" && body instanceof FormData;
   let reponse;
   try {
     reponse = await fetch(url, {
       method,
+      // Pour un FormData, on NE MET PAS Content-Type : le navigateur doit
+      // fixer lui-même la frontière multipart (boundary), sinon la requête
+      // est mal formée et l'API ne peut pas parser le fichier envoyé.
       headers: {
-        ...(body ? { "Content-Type": "application/json" } : {}),
+        ...(body && !estFormData ? { "Content-Type": "application/json" } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: body ? JSON.stringify(body) : undefined,
+      body: body ? (estFormData ? body : JSON.stringify(body)) : undefined,
     });
   } catch (e) {
     throw new ErreurApi(
@@ -187,6 +191,16 @@ function BandeauErreur({ message }) {
   );
 }
 
+function BandeauSucces({ message }) {
+  if (!message) return null;
+  return (
+    <div className="rounded-lg px-4 py-3 mb-4 flex items-start gap-2 text-sm" style={{ backgroundColor: C.vertFond, color: C.vert }}>
+      <Check size={15} className="mt-0.5 flex-shrink-0" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
 function ChipMatiere({ label, active, onClick, icon: Icon }) {
   return (
     <button
@@ -276,6 +290,7 @@ function BarreNav({ vue, setVue, onDeconnexion, nombreEnAttente }) {
     { id: "accueil", label: "Accueil" },
     { id: "mes-cours", label: "Mes cours" },
     { id: "mes-classes", label: "Mes classes" },
+    { id: "mes-documents", label: "Mes documents" },
     { id: "file", label: "À valider", badge: nombreEnAttente },
     { id: "historique", label: "Historique" },
   ];
@@ -1244,10 +1259,256 @@ function EcranHistorique({ historique }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Écran : Mes documents (notes de cours privées + partage)           */
+/* ------------------------------------------------------------------ */
+
+function BadgeStatutDocument({ statut }) {
+  const map = {
+    en_traitement: { label: "Indexation en cours...", bg: C.bleuFond, fg: C.encre },
+    indexe: { label: "Indexé", bg: C.vertFond, fg: C.vert },
+    erreur: { label: "Erreur d'indexation", bg: C.rougeFond, fg: C.rouge },
+  };
+  const s = map[statut] || map.en_traitement;
+  return (
+    <span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: s.bg, color: s.fg }}>
+      {s.label}
+    </span>
+  );
+}
+
+function FormulaireDepotNotes({ token, classes, onDepose }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [titre, setTitre] = useState("");
+  const [niveauId, setNiveauId] = useState("");
+  const [matiereId, setMatiereId] = useState("");
+  const [fichier, setFichier] = useState(null);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState(null);
+
+  // Niveaux et matières déduits des propres affectations de l'enseignant —
+  // il ne dépose des notes que sur ce qu'il enseigne réellement.
+  const niveaux = [...new Map(classes.map((c) => [c.niveau_id, c.niveau])).entries()];
+  const matieres = [...new Map(classes.map((c) => [c.matiere_id, c.matiere])).entries()];
+
+  async function soumettre(e) {
+    e.preventDefault();
+    if (!fichier) { setErreur("Choisissez un fichier PDF."); return; }
+    setEnvoi(true); setErreur(null);
+    try {
+      const formData = new FormData();
+      formData.append("fichier", fichier);
+      await apiFetch("/enseignant/documents", {
+        method: "POST", token, params: { titre, niveau_id: niveauId || undefined, matiere_id: matiereId || undefined },
+        body: formData,
+      });
+      setTitre(""); setNiveauId(""); setMatiereId(""); setFichier(null); setOuvert(false);
+      onDepose();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoi(false); }
+  }
+
+  if (!ouvert) {
+    return (
+      <button onClick={() => setOuvert(true)} className="eduai-focus flex items-center gap-1.5 text-xs font-medium" style={{ color: C.accentFonce }}>
+        <Plus size={13} /> Déposer mes notes de cours
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={soumettre} className="rounded-lg p-4 border space-y-2.5" style={{ borderColor: C.ligne, backgroundColor: C.fond }}>
+      <BandeauErreur message={erreur} />
+      <input required value={titre} onChange={(e) => setTitre(e.target.value)} placeholder="Titre (ex : Mes notes sur les fractions)"
+        className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }} />
+      <div className="grid grid-cols-2 gap-2">
+        <select value={niveauId} onChange={(e) => setNiveauId(e.target.value)} className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }}>
+          <option value="">Niveau (optionnel)...</option>
+          {niveaux.map(([id, nom]) => <option key={id} value={id}>{nom}</option>)}
+        </select>
+        <select value={matiereId} onChange={(e) => setMatiereId(e.target.value)} className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }}>
+          <option value="">Matière (optionnel)...</option>
+          {matieres.map(([id, nom]) => <option key={id} value={id}>{nom}</option>)}
+        </select>
+      </div>
+      <label className="eduai-focus flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium border cursor-pointer w-fit" style={{ borderColor: C.ligne, color: C.encre, backgroundColor: C.surface }}>
+        <Upload size={12} />
+        {fichier ? fichier.name : "Choisir un PDF"}
+        <input type="file" accept="application/pdf" className="hidden" onChange={(e) => setFichier(e.target.files[0] || null)} />
+      </label>
+      <p className="text-xs" style={{ color: C.encreAttenue }}>
+        Privé par défaut — visible seulement par vous, jusqu'à ce que vous le partagiez explicitement avec un collègue.
+      </p>
+      <div className="flex gap-2 pt-1">
+        <button type="submit" disabled={envoi} className="eduai-focus rounded-lg px-3.5 py-2 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
+          {envoi ? <Loader2 size={12} className="eduai-spin" /> : "Déposer"}
+        </button>
+        <button type="button" onClick={() => setOuvert(false)} className="eduai-focus text-xs font-medium" style={{ color: C.encreDoux }}>Annuler</button>
+      </div>
+    </form>
+  );
+}
+
+function PanneauPartage({ token, documentId, onFerme }) {
+  const [collegues, setCollegues] = useState([]);
+  const [partages, setPartages] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+  const [enCours, setEnCours] = useState(null);
+
+  const charger = useCallback(() => {
+    setChargement(true); setErreur(null);
+    Promise.all([
+      apiFetch("/enseignant/documents/collegues", { token }),
+      apiFetch(`/enseignant/documents/${documentId}/partages`, { token }),
+    ]).then(([c, p]) => { setCollegues(c); setPartages(p); })
+      .catch((e) => setErreur(e.message)).finally(() => setChargement(false));
+  }, [token, documentId]);
+
+  useEffect(() => { charger(); }, [charger]);
+
+  const idsPartages = new Set(partages.map((p) => p.id));
+
+  async function partagerAvec(utilisateurId) {
+    setEnCours(utilisateurId); setErreur(null);
+    try {
+      await apiFetch(`/enseignant/documents/${documentId}/partager`, { method: "POST", token, body: { utilisateur_id: utilisateurId } });
+      charger();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnCours(null); }
+  }
+
+  async function revoquer(utilisateurId) {
+    setEnCours(utilisateurId); setErreur(null);
+    try {
+      await apiFetch(`/enseignant/documents/${documentId}/partager/${utilisateurId}`, { method: "DELETE", token });
+      charger();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnCours(null); }
+  }
+
+  return (
+    <div className="mt-2 rounded-lg border p-3" style={{ borderColor: C.ligne, backgroundColor: C.fond }}>
+      <div className="flex items-center justify-between mb-2.5">
+        <p className="text-xs font-semibold" style={{ color: C.encre }}>Partager avec...</p>
+        <button onClick={onFerme} className="eduai-focus text-xs" style={{ color: C.encreAttenue }}>Fermer</button>
+      </div>
+      <BandeauErreur message={erreur} />
+      {chargement ? <Chargement /> : collegues.length === 0 ? (
+        <p className="text-xs" style={{ color: C.encreAttenue }}>Aucun autre enseignant dans votre établissement pour l'instant.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {collegues.map((c) => {
+            const partage = idsPartages.has(c.id);
+            return (
+              <div key={c.id} className="flex items-center justify-between text-xs">
+                <span style={{ color: C.encre }}>{c.prenom} {c.nom}</span>
+                <button
+                  onClick={() => (partage ? revoquer(c.id) : partagerAvec(c.id))}
+                  disabled={enCours === c.id}
+                  className="eduai-focus rounded-full px-2.5 py-1 font-medium disabled:opacity-60"
+                  style={partage
+                    ? { backgroundColor: C.vertFond, color: C.vert }
+                    : { border: `1px solid ${C.ligne}`, color: C.encreDoux }}
+                >
+                  {enCours === c.id ? <Loader2 size={10} className="eduai-spin" /> : partage ? "Partagé — révoquer" : "Partager"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EcranMesDocuments({ token, classes }) {
+  const [documents, setDocuments] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+  const [panneauOuvertPour, setPanneauOuvertPour] = useState(null);
+
+  const charger = useCallback(() => {
+    setChargement(true); setErreur(null);
+    apiFetch("/enseignant/documents", { token })
+      .then(setDocuments).catch((e) => setErreur(e.message)).finally(() => setChargement(false));
+  }, [token]);
+
+  useEffect(() => { charger(); }, [charger]);
+
+  async function supprimer(id) {
+    try {
+      await apiFetch(`/enseignant/documents/${id}`, { method: "DELETE", token });
+      setDocuments((prev) => prev.filter((d) => d.id !== id));
+    } catch (e) { setErreur(e.message); }
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
+      <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Mes documents</h1>
+      <p className="text-sm mb-8" style={{ color: C.encreDoux }}>
+        Vos notes de cours, utilisées par l'IA pour ancrer ses générations. Privées par défaut — un document que vous
+        déposez n'est visible que par vous, jusqu'à ce que vous le partagiez explicitement avec un collègue de votre établissement.
+      </p>
+
+      <BandeauErreur message={erreur} />
+
+      <div className="rounded-2xl p-6 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+        <h2 className="eduai-display text-lg mb-4" style={{ color: C.encre }}>Notes de cours</h2>
+
+        <FormulaireDepotNotes token={token} classes={classes} onDepose={charger} />
+
+        {chargement ? <Chargement /> : (
+          <div className="space-y-2 mt-5">
+            {documents.map((d) => (
+              <div key={d.id} className="rounded-lg border px-3 py-2.5" style={{ borderColor: C.ligne }}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <FileText size={15} color={C.encreAttenue} className="flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate" style={{ color: C.encre }}>{d.titre}</p>
+                      <p className="text-xs" style={{ color: C.encreAttenue }}>
+                        {[d.niveau, d.matiere].filter(Boolean).join(" · ") || "Niveau/matière non précisés"}
+                        {!d.est_proprietaire && " · Partagé avec vous"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <BadgeStatutDocument statut={d.statut} />
+                    {d.est_proprietaire ? (
+                      <>
+                        <button onClick={() => setPanneauOuvertPour(panneauOuvertPour === d.id ? null : d.id)}
+                          className="eduai-focus flex items-center gap-1 text-xs font-medium" style={{ color: C.accentFonce }}>
+                          <Share2 size={12} /> Partager
+                        </button>
+                        <button onClick={() => supprimer(d.id)} className="eduai-focus" aria-label="Supprimer" style={{ color: C.encreAttenue }}>
+                          <Trash2 size={14} />
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-xs italic" style={{ color: C.encreAttenue }}>Lecture seule</span>
+                    )}
+                  </div>
+                </div>
+                {panneauOuvertPour === d.id && (
+                  <PanneauPartage token={token} documentId={d.id} onFerme={() => setPanneauOuvertPour(null)} />
+                )}
+              </div>
+            ))}
+            {documents.length === 0 && (
+              <p className="text-sm text-center py-6" style={{ color: C.encreAttenue }}>Aucune note de cours déposée pour l'instant.</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Application                                                        */
 /* ------------------------------------------------------------------ */
 
-export default function EspaceEnseignant() {
+export default function App() {
   const [token, setToken] = useState(null);
   const [connexionEnCours, setConnexionEnCours] = useState(false);
   const [erreurConnexion, setErreurConnexion] = useState(null);
@@ -1340,6 +1601,7 @@ export default function EspaceEnseignant() {
           {vue === "cours-detail" && coursActifId && <EcranCoursDetail coursId={coursActifId} token={token} setVue={setVue} />}
 
           {vue === "mes-classes" && <EcranMesClasses classes={classes} chargement={chargementClasses} erreur={erreurClasses} setVue={setVue} setClasseActive={setClasseActive} />}
+          {vue === "mes-documents" && <EcranMesDocuments token={token} classes={classes} />}
           {vue === "classe-detail" && classeActive && <EcranClasseDetail classeActive={classeActive} token={token} setVue={setVue} setEleveActif={setEleveActif} />}
           {vue === "eleve-detail" && eleveActif && classeActive && <EcranEleveDetail eleveActif={eleveActif} classeActive={classeActive} token={token} setVue={setVue} />}
 

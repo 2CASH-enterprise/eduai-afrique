@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   GraduationCap, Lock, Mail, LogOut, Bell, Loader2, AlertTriangle,
   Users, Plus, UserX, ScrollText, Send, Wallet, Check, Copy, Upload, FileSpreadsheet, Download,
+  FileText, Trash2, BookMarked,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -163,6 +164,7 @@ function BarreNav({ vue, setVue, onDeconnexion }) {
     { id: "notifications", label: "Notifications" },
     { id: "paiements", label: "Paiements" },
     { id: "etablissement", label: "Établissement" },
+    { id: "documents", label: "Documents" },
   ];
   return (
     <div className="sticky top-0 z-10 px-4 sm:px-8 py-3.5 flex items-center justify-between border-b flex-wrap gap-y-2"
@@ -1223,10 +1225,161 @@ function CalendrierReferentiel({ token, referentielId }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Écran : Documents (programmes officiels — portée plateforme)       */
+/* ------------------------------------------------------------------ */
+
+function BadgeStatutDocument({ statut }) {
+  const map = {
+    en_traitement: { label: "Indexation en cours...", bg: C.bleuFond, fg: C.encre },
+    indexe: { label: "Indexé", bg: C.vertFond, fg: C.vert },
+    erreur: { label: "Erreur d'indexation", bg: C.rougeFond, fg: C.rouge },
+  };
+  const s = map[statut] || map.en_traitement;
+  return (
+    <span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: s.bg, color: s.fg }}>
+      {s.label}
+    </span>
+  );
+}
+
+function FormulaireDepotProgramme({ token, classes, matieres, onDepose }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [titre, setTitre] = useState("");
+  const [niveauId, setNiveauId] = useState("");
+  const [matiereId, setMatiereId] = useState(matieres[0]?.id || "");
+  const [fichier, setFichier] = useState(null);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState(null);
+
+  const niveaux = [...new Map(classes.map((c) => [c.niveau_id, c.niveau])).entries()];
+
+  async function soumettre(e) {
+    e.preventDefault();
+    if (!fichier) { setErreur("Choisissez un fichier PDF."); return; }
+    setEnvoi(true); setErreur(null);
+    try {
+      const formData = new FormData();
+      formData.append("fichier", fichier);
+      await apiFetch("/administration/documents", {
+        method: "POST", token, params: { titre, niveau_id: niveauId || undefined, matiere_id: matiereId || undefined },
+        body: formData,
+      });
+      setTitre(""); setNiveauId(""); setFichier(null); setOuvert(false);
+      onDepose();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoi(false); }
+  }
+
+  if (!ouvert) {
+    return (
+      <button onClick={() => setOuvert(true)} className="eduai-focus flex items-center gap-1.5 text-xs font-medium" style={{ color: C.accentFonce }}>
+        <Plus size={13} /> Déposer un programme officiel
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={soumettre} className="rounded-lg p-4 border space-y-2.5" style={{ borderColor: C.ligne, backgroundColor: C.fond }}>
+      <BandeauErreur message={erreur} />
+      <input required value={titre} onChange={(e) => setTitre(e.target.value)} placeholder="Titre (ex : Programme Maths 6ème — MINESEC)"
+        className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }} />
+      <div className="grid grid-cols-2 gap-2">
+        <select value={niveauId} onChange={(e) => setNiveauId(e.target.value)} className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }}>
+          <option value="">Niveau (optionnel)...</option>
+          {niveaux.map(([id, nom]) => <option key={id} value={id}>{nom}</option>)}
+        </select>
+        <select value={matiereId} onChange={(e) => setMatiereId(e.target.value)} className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }}>
+          {matieres.map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
+        </select>
+      </div>
+      <label className="eduai-focus flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium border cursor-pointer w-fit" style={{ borderColor: C.ligne, color: C.encre, backgroundColor: C.surface }}>
+        <Upload size={12} />
+        {fichier ? fichier.name : "Choisir un PDF"}
+        <input type="file" accept="application/pdf" className="hidden" onChange={(e) => setFichier(e.target.files[0] || null)} />
+      </label>
+      <div className="flex gap-2 pt-1">
+        <button type="submit" disabled={envoi} className="eduai-focus rounded-lg px-3.5 py-2 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
+          {envoi ? <Loader2 size={12} className="eduai-spin" /> : "Déposer"}
+        </button>
+        <button type="button" onClick={() => setOuvert(false)} className="eduai-focus text-xs font-medium" style={{ color: C.encreDoux }}>Annuler</button>
+      </div>
+    </form>
+  );
+}
+
+function EcranDocuments({ token, classes, matieres }) {
+  const [documents, setDocuments] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+
+  const charger = useCallback(() => {
+    setChargement(true); setErreur(null);
+    apiFetch("/administration/documents", { token })
+      .then(setDocuments).catch((e) => setErreur(e.message)).finally(() => setChargement(false));
+  }, [token]);
+
+  useEffect(() => { charger(); }, [charger]);
+
+  async function supprimer(id) {
+    try {
+      await apiFetch(`/administration/documents/${id}`, { method: "DELETE", token });
+      setDocuments((prev) => prev.filter((d) => d.id !== id));
+    } catch (e) { setErreur(e.message); }
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
+      <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Documents</h1>
+      <p className="text-sm mb-8" style={{ color: C.encreDoux }}>
+        Programmes officiels utilisés par l'IA pour ancrer ses générations. Une fois déposé, un document est
+        <span className="font-semibold"> visible et réutilisable par tous les établissements de la plateforme</span> —
+        aucun contenu n'est jamais relu ni téléchargé, seul le texte indexé sert en interne.
+      </p>
+
+      <BandeauErreur message={erreur} />
+
+      <div className="rounded-2xl p-6 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+        <h2 className="eduai-display text-lg mb-4" style={{ color: C.encre }}>Programmes officiels</h2>
+
+        <FormulaireDepotProgramme token={token} classes={classes} matieres={matieres} onDepose={charger} />
+
+        {chargement ? <Chargement /> : (
+          <div className="space-y-2 mt-5">
+            {documents.map((d) => (
+              <div key={d.id} className="flex items-center justify-between rounded-lg border px-3 py-2.5" style={{ borderColor: C.ligne }}>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <FileText size={15} color={C.encreAttenue} className="flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: C.encre }}>{d.titre}</p>
+                    <p className="text-xs" style={{ color: C.encreAttenue }}>
+                      {[d.niveau, d.matiere].filter(Boolean).join(" · ") || "Niveau/matière non précisés"}
+                      {d.nombre_pages ? ` · ${d.nombre_pages} page${d.nombre_pages > 1 ? "s" : ""}` : ""}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <BadgeStatutDocument statut={d.statut} />
+                  <button onClick={() => supprimer(d.id)} className="eduai-focus" aria-label="Supprimer" style={{ color: C.encreAttenue }}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {documents.length === 0 && (
+              <p className="text-sm text-center py-6" style={{ color: C.encreAttenue }}>Aucun programme officiel déposé pour l'instant.</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Application                                                        */
 /* ------------------------------------------------------------------ */
 
-export default function EspaceAdministration() {
+export default function App() {
   const [token, setToken] = useState(null);
   const [connexionEnCours, setConnexionEnCours] = useState(false);
   const [erreurConnexion, setErreurConnexion] = useState(null);
@@ -1264,6 +1417,7 @@ export default function EspaceAdministration() {
           {vue === "notifications" && <EcranNotificationsDiffusion token={token} classes={classes} />}
           {vue === "paiements" && <EcranPaiements token={token} />}
           {vue === "etablissement" && <EcranEtablissement token={token} classes={classes} matieres={matieres} />}
+          {vue === "documents" && <EcranDocuments token={token} classes={classes} matieres={matieres} />}
         </>
       )}
     </div>

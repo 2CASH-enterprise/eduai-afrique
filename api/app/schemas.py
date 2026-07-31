@@ -338,6 +338,7 @@ class ClasseEnseignant(BaseModel):
     classe_id: str
     matiere_id: str
     nom: str
+    niveau_id: str
     niveau: str
     matiere: str
     effectif: int
@@ -475,6 +476,11 @@ class DocumentPedagogique(BaseModel):
     statut: str
     erreur_traitement: str | None
     nombre_passages: int
+    est_proprietaire: bool = True
+    # True par défaut (cas programme_officiel, où la notion de partage ne
+    # s'applique pas) ; pour notes_cours, calculé côté serveur — False
+    # signifie "document partagé avec vous par un collègue", en lecture
+    # seule (pas de suppression, pas de re-partage possible).
 
 
 class PassageRecherche(BaseModel):
