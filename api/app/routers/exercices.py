@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from .. import rag
 from ..db import get_cursor
 from ..deps import get_enseignant_connecte
 from ..schemas import (ExerciceEnAttente, ModificationExercice, RejetExercice,
@@ -159,6 +160,15 @@ def valider_exercice(
             (enseignant.id, exercice_id),
         )
         resultat = cur.fetchone()
+
+    # Type 3 du corpus documentaire : un exercice validé par un humain est
+    # une création propre de la plateforme, réinjectée pour enrichir les
+    # futures générations — jamais consultable comme document par ailleurs
+    # (voir rag.reinjecter_contenu_valide). Best-effort : ne bloque jamais
+    # la validation elle-même en cas de souci d'indexation.
+    texte_exercice = "\n".join(filter(None, [row[5], row[8], row[9], "\n".join(row[10] or [])]))
+    rag.reinjecter_contenu_valide(titre=row[5] or "Exercice validé", texte=texte_exercice,
+                                    niveau_id=row[1], matiere_id=row[2])
 
     return ExerciceValide(id=str(resultat[0]), statut=resultat[1],
                            valide_par_id=str(resultat[2]), date_validation=resultat[3])

@@ -1,6 +1,7 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from .. import rag
 from ..db import get_cursor
 from ..deps import get_enseignant_connecte
 from ..schemas import DepotCours, CoursResume, CoursDetail, ModificationRessource, EnseignantConnecte
@@ -185,5 +186,31 @@ def modifier_ressource(
         assignations = ", ".join(f"{k} = %s" for k in champs)
         cur.execute(f"UPDATE ressources_generees SET {assignations} WHERE id = %s",
                     (*champs.values(), ressource_id))
+
+        # Type 3 du corpus documentaire : une ressource de cours validée par
+        # l'enseignant est une création propre de la plateforme, réinjectée
+        # pour enrichir les futures générations — jamais consultable comme
+        # document par ailleurs (voir rag.reinjecter_contenu_valide).
+        texte, niveau_id, matiere_id, titre_reinjection = None, None, None, None
+        if payload.statut == "valide":
+            cur.execute(
+                """
+                SELECT c.matiere_id, cl.niveau_id, c.titre, r.type_ressource, r.contenu
+                FROM ressources_generees r
+                JOIN cours c ON c.id = r.cours_id
+                JOIN classes cl ON cl.id = c.classe_id
+                WHERE r.id = %s
+                """,
+                (ressource_id,),
+            )
+            matiere_id, niveau_id, titre_cours, type_ressource, contenu_json = cur.fetchone()
+            if contenu_json:
+                donnees = contenu_json if isinstance(contenu_json, dict) else json.loads(contenu_json)
+                texte = donnees.get("texte")
+            titre_reinjection = f"{titre_cours} — {LABELS_RESSOURCE.get(type_ressource, type_ressource)}"
+
+    if texte:
+        rag.reinjecter_contenu_valide(titre=titre_reinjection, texte=texte,
+                                        niveau_id=niveau_id, matiere_id=matiere_id)
 
     return {"statut": "ok"}

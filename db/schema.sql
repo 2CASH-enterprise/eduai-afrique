@@ -409,10 +409,12 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE documents_pedagogiques (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    etablissement_id    UUID NOT NULL REFERENCES etablissements(id) ON DELETE CASCADE,
+    etablissement_id    UUID REFERENCES etablissements(id) ON DELETE CASCADE,
+    -- NULL = portée plateforme entière (programme_officiel, genere_valide) ;
+    -- une vraie valeur = privé à un établissement (notes_cours uniquement).
     depose_par_id       UUID REFERENCES utilisateurs(id),
     type_document        TEXT NOT NULL DEFAULT 'notes_cours'
-                        CHECK (type_document IN ('programme_officiel', 'notes_cours')),
+                        CHECK (type_document IN ('programme_officiel', 'notes_cours', 'genere_valide')),
     niveau_id           UUID REFERENCES niveaux(id),
     matiere_id          UUID REFERENCES matieres(id),
     titre               TEXT NOT NULL,
@@ -420,10 +422,26 @@ CREATE TABLE documents_pedagogiques (
     statut              TEXT NOT NULL DEFAULT 'en_traitement'
                         CHECK (statut IN ('en_traitement', 'indexe', 'erreur')),
     erreur_traitement   TEXT,
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT documents_pedagogiques_notes_cours_proprietaire CHECK (
+        type_document != 'notes_cours'
+        OR (etablissement_id IS NOT NULL AND depose_par_id IS NOT NULL)
+    )
 );
 CREATE INDEX idx_documents_etablissement ON documents_pedagogiques(etablissement_id);
 CREATE INDEX idx_documents_niveau_matiere ON documents_pedagogiques(niveau_id, matiere_id);
+
+-- Partage explicite d'une note de cours avec un ou plusieurs collègues du
+-- même établissement — jamais automatique, jamais entre établissements.
+CREATE TABLE documents_partages (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_id         UUID NOT NULL REFERENCES documents_pedagogiques(id) ON DELETE CASCADE,
+    partage_avec_id     UUID NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (document_id, partage_avec_id)
+);
+CREATE INDEX idx_documents_partages_document ON documents_partages(document_id);
+CREATE INDEX idx_documents_partages_utilisateur ON documents_partages(partage_avec_id);
 
 CREATE TABLE passages_documents (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
