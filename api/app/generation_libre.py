@@ -34,7 +34,7 @@ Contraintes :
 quotidienne au Cameroun) — sans le forcer si le thème ne s'y prête pas."""
 
 
-def generer_exercice_a_la_demande(matiere: str, niveau: str, theme: str) -> dict:
+def generer_exercice_a_la_demande(matiere: str, niveau: str, theme: str, passages_contexte: list[str] | None = None) -> dict:
     """Appelle Mistral directement et retourne le JSON parsé. Lève une
     HTTPException explicite en cas d'échec — contrairement au pipeline par
     lot, ici il y a un utilisateur en attente d'une réponse immédiate, donc
@@ -43,13 +43,20 @@ def generer_exercice_a_la_demande(matiere: str, niveau: str, theme: str) -> dict
     if not api_key:
         raise HTTPException(status_code=503, detail="MISTRAL_API_KEY absente sur le serveur")
 
+    prompt = _construire_prompt(matiere, niveau, theme)
+    if passages_contexte:
+        prompt += (
+            "\n\nExtraits de référence disponibles (programme officiel et/ou notes de cours) — "
+            "à utiliser s'ils sont pertinents, sans t'y limiter :\n" + "\n---\n".join(passages_contexte)
+        )
+
     client = Mistral(api_key=api_key)
     try:
         reponse = client.chat.complete(
             model=MODELE,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": _construire_prompt(matiere, niveau, theme)},
+                {"role": "user", "content": prompt},
             ],
             response_format={"type": "json_object"},
             temperature=0.7,

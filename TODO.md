@@ -143,15 +143,33 @@ interception dans le `catch` du premier chargement (Élève, Parent).
 
 ---
 
-## 7. Brancher réellement la recherche RAG sur la génération de cours/exercices
+## 7. Brancher réellement la recherche RAG sur la génération de cours/exercices — ✅ FAIT le 01/08
 
-`rag.rechercher_passages_pertinents` existe et est testée (voir la session
-du corpus documentaire), mais n'est encore appelée nulle part dans le code
-de génération réel (pipeline Maths/PC par templates, génération LLM
-Mistral pour Français/SVT/HG). Tant que ce branchement n'est pas fait, tout
-le travail du corpus documentaire (programmes officiels, notes de cours,
-réinjection du contenu validé) n'a aucun effet concret sur ce que l'IA
-génère.
+**Découverte en cours de route** : la génération de "ressources de cours"
+(fiches, résumés, QCM...) n'appelait **aucune IA** — texte gabarit codé en
+dur, avec une note explicite dans le code disant "à remplacer par un vrai
+appel LLM". Brancher le RAG a donc d'abord nécessité de construire ce vrai
+appel manquant.
+
+**Construit et déployé** :
+- Nouveau module `generation_cours.py` — remplace le gabarit statique par
+  un vrai appel Mistral pour les 6 types de ressources (fiche pédagogique,
+  résumé, exercices, QCM, devoir, contrôle), enrichi par
+  `rag.rechercher_passages_pertinents` (programme officiel + notes de
+  l'enseignant + contenu déjà validé, filtré par niveau/matière/établissement)
+  et par le contenu réellement enseigné (`contenu_texte` du cours déposé).
+  Statut `en_attente` inchangé — relecture humaine toujours obligatoire.
+- `enseignant/generation-libre` enrichi de la même façon (best-effort,
+  filtré seulement par matière puisqu'aucun `niveau_id` n'existe pour un
+  enseignant indépendant).
+- Testé de bout en bout : confirmé que 6 vrais appels LLM ont désormais
+  lieu au dépôt d'un cours (au lieu de zéro), et que le contexte RAG est
+  bien injecté dans le prompt quand des documents pertinents existent.
+
+**Reste à part, non traité** : le pipeline d'exercices hors-ligne
+(`pipeline/generator_llm.py`, `generator_math.py`) — toujours un script
+batch exécuté manuellement, jamais déclenché par l'API. Brancher le RAG
+dessus serait un chantier séparé.
 
 ---
 

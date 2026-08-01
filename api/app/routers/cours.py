@@ -2,6 +2,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from .. import rag
+from .. import generation_cours
 from ..db import get_cursor
 from ..deps import get_enseignant_connecte
 from ..schemas import DepotCours, CoursResume, CoursDetail, ModificationRessource, EnseignantConnecte
@@ -19,30 +20,6 @@ LABELS_RESSOURCE = {
     "controle": "Contrôle",
 }
 
-
-def _generer_contenu_ressource(type_ressource: str, titre_cours: str) -> dict:
-    """Génère le contenu d'une ressource pédagogique à partir du cours déposé.
-
-    NOTE V1 : génération templatée, pas d'appel LLM ici — même logique de
-    prudence que le pipeline d'exercices (generator_llm.py) : un vrai appel
-    Mistral produirait un contenu plus riche, mais nécessiterait la même
-    relecture humaine obligatoire avant publication (statut 'en_attente').
-    Remplacer cette fonction par un appel à generator_llm quand l'intégration
-    sera branchée ici — le contrat (retourner un dict JSON) ne change pas.
-    """
-    gabarits = {
-        "fiche_pedagogique": f"Objectifs : maîtriser « {titre_cours} ». Compétences visées : "
-                              f"comprendre la notion, l'appliquer, la réutiliser dans un exercice similaire.",
-        "resume": f"Résumé en une page de « {titre_cours} » — définitions clés, règle principale, "
-                  f"un exemple travaillé en classe.",
-        "exercices": f"10 exercices d'application sur « {titre_cours} », du plus facile au plus difficile, "
-                     f"avec corrigés détaillés.",
-        "qcm": f"Questionnaire à choix multiples de 8 questions sur « {titre_cours} ».",
-        "devoir": f"Devoir maison : 5 exercices + 1 problème contextualisé sur « {titre_cours} ».",
-        "controle": f"Contrôle en classe (1h) sur « {titre_cours} » : 3 exercices d'application, "
-                    f"1 exercice de synthèse.",
-    }
-    return {"texte": gabarits[type_ressource]}
 
 
 def _verifier_cours_du_enseignant(cur, cours_id: str, enseignant_id: str):
@@ -88,9 +65,21 @@ def deposer_cours(
         )
         cours_id, titre, contenu_texte, created_at = cur.fetchone()
 
+        cur.execute("SELECT nom FROM matieres WHERE id = %s", (payload.matiere_id,))
+        matiere_nom = cur.fetchone()[0]
+        cur.execute(
+            "SELECT c.niveau_id, n.nom, c.etablissement_id FROM classes c "
+            "JOIN niveaux n ON n.id = c.niveau_id WHERE c.id = %s",
+            (payload.classe_id,),
+        )
+        niveau_id, niveau_nom, etablissement_id = cur.fetchone()
+
         ressources = []
         for type_ressource in TYPES_RESSOURCE:
-            contenu = _generer_contenu_ressource(type_ressource, titre)
+            contenu = generation_cours.generer_ressource(
+                type_ressource, titre, contenu_texte, matiere_nom, niveau_nom,
+                str(niveau_id), payload.matiere_id, str(etablissement_id), enseignant.id,
+            )
             cur.execute(
                 """
                 INSERT INTO ressources_generees (cours_id, type_ressource, contenu, statut)
@@ -102,8 +91,6 @@ def deposer_cours(
             ressources.append({"id": str(r_id), "type_ressource": r_type, "label": LABELS_RESSOURCE[r_type],
                                 "contenu": r_contenu, "statut": r_statut})
 
-        cur.execute("SELECT nom FROM matieres WHERE id = %s", (payload.matiere_id,))
-        matiere_nom = cur.fetchone()[0]
         cur.execute("SELECT nom FROM classes WHERE id = %s", (payload.classe_id,))
         classe_nom = cur.fetchone()[0]
 
