@@ -339,6 +339,7 @@ function BarreNav({ vue, setVue, onDeconnexion, nombreEnAttente, nombreInvitatio
     { id: "mes-classes", label: "Mes classes" },
     { id: "mes-documents", label: "Mes documents" },
     { id: "generation-libre", label: "Génération libre" },
+    { id: "mes-credits", label: "Mes crédits" },
     { id: "invitations", label: "Invitations", badge: nombreInvitations },
     { id: "file", label: "À valider", badge: nombreEnAttente },
     { id: "historique", label: "Historique" },
@@ -1827,6 +1828,70 @@ function EcranInvitations({ token, onTraitee }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Écran : Mes crédits                                                 */
+/* ------------------------------------------------------------------ */
+
+const LABELS_MOTIF = {
+  validation_simple: "Ressource validée",
+  validation_corrigee: "Ressource corrigée puis validée",
+  depot_cours: "Cours déposé",
+};
+
+function EcranMesCredits({ token }) {
+  const [donnees, setDonnees] = useState(null);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+
+  useEffect(() => {
+    apiFetch("/enseignant/credits", { token }).then(setDonnees).catch((e) => setErreur(e.message)).finally(() => setChargement(false));
+  }, [token]);
+
+  if (chargement) return <div className="max-w-2xl mx-auto px-4 sm:px-8 py-10"><Chargement /></div>;
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
+      <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Mes crédits</h1>
+      <p className="text-sm mb-8" style={{ color: C.encreDoux }}>
+        Gagnés en validant vos ressources — la Génération libre reste toujours gratuite, quel que soit votre solde.
+      </p>
+
+      <BandeauErreur message={erreur} />
+
+      {donnees && (
+        <>
+          <div className="rounded-2xl p-7 border mb-6 text-center" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+            <p className="eduai-display text-5xl mb-1" style={{ color: C.encre }}>{donnees.solde}</p>
+            <p className="text-xs" style={{ color: C.encreAttenue }}>crédit{donnees.solde !== 1 ? "s" : ""}</p>
+            {donnees.en_periode_gratuite ? (
+              <div className="mt-4 rounded-lg px-3 py-2 text-xs inline-flex items-center gap-1.5" style={{ backgroundColor: C.vertFond, color: C.vert }}>
+                <Check size={12} /> Période gratuite — Déposer un cours reste illimité pour l'instant
+              </div>
+            ) : (
+              <div className="mt-4 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: C.bleuFond, color: C.encre }}>
+                Chaque dépôt de cours coûte 2 crédits — validez des ressources pour en gagner
+              </div>
+            )}
+          </div>
+
+          <h2 className="eduai-display text-lg mb-3" style={{ color: C.encre }}>Historique récent</h2>
+          <div className="space-y-1.5">
+            {donnees.historique.map((h, i) => (
+              <div key={i} className="flex items-center justify-between rounded-lg border px-3 py-2.5" style={{ borderColor: C.ligne }}>
+                <span className="text-sm" style={{ color: C.encre }}>{LABELS_MOTIF[h.motif] || h.motif}</span>
+                <span className="eduai-mono text-xs font-semibold" style={{ color: h.delta > 0 ? C.vert : C.rouge }}>
+                  {h.delta > 0 ? "+" : ""}{h.delta}
+                </span>
+              </div>
+            ))}
+            {donnees.historique.length === 0 && <p className="text-sm text-center py-6" style={{ color: C.encreAttenue }}>Aucun mouvement pour l'instant.</p>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Application                                                        */
 /* ------------------------------------------------------------------ */
 
@@ -1941,6 +2006,7 @@ export default function App() {
           {vue === "deposer-cours" && <EcranDeposerCours classes={classes} token={token} setVue={setVue} onCoursDepose={onCoursDepose} />}
           {vue === "cours-detail" && coursActifId && <EcranCoursDetail coursId={coursActifId} token={token} setVue={setVue} />}
           {vue === "generation-libre" && <EcranGenerationLibre token={token} />}
+          {vue === "mes-credits" && <EcranMesCredits token={token} />}
           {vue === "invitations" && <EcranInvitations token={token} onTraitee={() => apiFetch("/enseignant/invitations", { token }).then((inv) => setNombreInvitations(inv.length)).catch(() => {})} />}
 
           {vue === "mes-classes" && <EcranMesClasses classes={classes} chargement={chargementClasses} erreur={erreurClasses} setVue={setVue} setClasseActive={setClasseActive} token={token} />}

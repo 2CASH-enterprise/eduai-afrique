@@ -1,12 +1,42 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 
 from .. import rag
+from .. import credits
 from ..db import get_cursor
 from ..deps import get_enseignant_connecte
 from ..generation_libre import generer_exercice_a_la_demande
 from ..schemas import DemandeGenerationLibre, ExerciceGenereLibre, EnseignantConnecte, MatiereResume
 
 router = APIRouter(prefix="/enseignant", tags=["generation-libre"])
+
+
+class MouvementCredit(BaseModel):
+    delta: int
+    motif: str
+    created_at: str
+
+
+class SoldeCredits(BaseModel):
+    solde: int
+    en_periode_gratuite: bool
+    historique: list[MouvementCredit]
+
+
+@router.get("/credits", response_model=SoldeCredits)
+def consulter_mes_credits(enseignant: EnseignantConnecte = Depends(get_enseignant_connecte)):
+    """Jauge strictement personnelle — jamais visible par l'établissement
+    (voir la discussion produit du 01/08)."""
+    with get_cursor() as cur:
+        gratuite = credits.en_periode_gratuite(cur, enseignant.id)
+        solde_actuel = credits.solde(cur, enseignant.id)
+        cur.execute(
+            "SELECT delta, motif, created_at FROM credits_enseignant WHERE enseignant_id = %s "
+            "ORDER BY created_at DESC LIMIT 20",
+            (enseignant.id,),
+        )
+        historique = [MouvementCredit(delta=d, motif=m, created_at=c.isoformat()) for d, m, c in cur.fetchall()]
+    return SoldeCredits(solde=solde_actuel, en_periode_gratuite=gratuite, historique=historique)
 
 
 def _rechercher_contexte_libre(matiere_nom: str, niveau: str, theme: str, matiere_id: str,

@@ -552,5 +552,19 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
     GRANT USAGE, SELECT ON SEQUENCES TO eduai_app;
 
 -- ============================================================================
+-- Système de crédits enseignant (voir migration 008 pour la logique complète)
+-- ============================================================================
+CREATE TABLE credits_enseignant (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    enseignant_id       UUID NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+    delta               INTEGER NOT NULL,
+    motif               TEXT NOT NULL
+                        CHECK (motif IN ('validation_simple', 'validation_corrigee', 'depot_cours')),
+    reference_id        UUID,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_credits_enseignant ON credits_enseignant(enseignant_id);
+
+-- ============================================================================
 -- FIN DU SCHÉMA V1
 -- ============================================================================

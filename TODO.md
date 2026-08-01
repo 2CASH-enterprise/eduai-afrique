@@ -204,6 +204,37 @@ de vrais utilisateurs).
 
 ---
 
+## 11. Système de crédits enseignant — ✅ FAIT le 01/08
+
+**Discuté et cadré le 01/08**, en réponse à une demande de modèle
+économique : transformer la relecture humaine des ressources IA (déjà
+indispensable pour la qualité de la plateforme) en mécanisme d'engagement.
+
+**Modèle retenu** :
+- Gagner : valider une ressource sans la modifier (+1 crédit), ou après
+  correction (+2 crédits) — dès le premier jour du compte, pour habituer
+  l'enseignant. La distinction simple/corrigée décourage le clic
+  automatique sans vraie relecture.
+- Dépenser : uniquement "Déposer un cours" (−2 crédits), et uniquement à
+  partir du 4e mois suivant la création du compte — avant ça, gratuit et
+  illimité, mais les crédits s'accumulent déjà en arrière-plan.
+- Génération libre : toujours gratuite, à vie, sans aucune condition.
+- Aucun suivi ni visibilité côté établissement — jauge strictement
+  personnelle à l'enseignant.
+
+**Préalable nécessaire, traité avant les crédits** : ajout des classes
+personnelles pour l'enseignant indépendant (voir point 1, mis à jour) —
+sans ça, un enseignant indépendant n'aurait rien de réel à valider pour
+gagner des crédits.
+
+**Construit et déployé** : table `credits_enseignant` (registre/ledger,
+traçable), module `credits.py`, vérification + débit avant tout dépôt de
+cours (donc avant l'appel IA — pas de génération gaspillée si crédits
+insuffisants), gain automatique à la validation dans `cours.py`, endpoint
+`GET /enseignant/credits` et écran "Mes crédits" (solde + historique).
+
+---
+
 ## 9. Déposer les vrais programmes officiels MINESEC
 
 Une fois récupérés par l'utilisateur (le site du MINESEC bloque l'accès

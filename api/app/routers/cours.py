@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from .. import rag
 from .. import generation_cours
+from .. import credits
 from ..db import get_cursor
 from ..deps import get_enseignant_connecte
 from ..schemas import DepotCours, CoursResume, CoursDetail, ModificationRessource, EnseignantConnecte
@@ -67,6 +68,12 @@ def deposer_cours(
             )
             if cur.fetchone() is None:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Classe personnelle introuvable")
+
+        # Vérifie et débite les crédits AVANT toute génération IA — pas de
+        # sens à appeler Mistral (coût réel) si l'enseignant ne peut de
+        # toute façon pas se permettre ce dépôt. Ne fait rien pendant les 3
+        # premiers mois du compte (voir credits.py).
+        credits.verifier_et_debiter_depot_cours(cur, enseignant.id)
 
         cur.execute(
             """
@@ -174,11 +181,13 @@ def modifier_ressource(
         _verifier_cours_du_enseignant(cur, cours_id, enseignant.id)
 
         cur.execute(
-            "SELECT id FROM ressources_generees WHERE id = %s AND cours_id = %s",
+            "SELECT statut FROM ressources_generees WHERE id = %s AND cours_id = %s",
             (ressource_id, cours_id),
         )
-        if cur.fetchone() is None:
+        row = cur.fetchone()
+        if row is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ressource introuvable")
+        statut_avant = row[0]
 
         champs = {}
         if payload.contenu is not None:
@@ -194,6 +203,12 @@ def modifier_ressource(
         assignations = ", ".join(f"{k} = %s" for k in champs)
         cur.execute(f"UPDATE ressources_generees SET {assignations} WHERE id = %s",
                     (*champs.values(), ressource_id))
+
+        # Système de crédits : gagné dès la validation, quel que soit le
+        # mois (voir credits.py) — +2 si la ressource avait été corrigée
+        # au préalable (preuve d'une vraie relecture), +1 sinon.
+        if payload.statut == "valide" and statut_avant != "valide":
+            credits.recompenser_validation(cur, enseignant.id, ressource_id, statut_avant)
 
         # Type 3 du corpus documentaire : une ressource de cours validée par
         # l'enseignant est une création propre de la plateforme, réinjectée
