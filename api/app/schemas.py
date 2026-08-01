@@ -350,6 +350,7 @@ class ClasseEnseignant(BaseModel):
     niveau_id: str
     niveau: str
     matiere: str
+    etablissement_nom: str
     effectif: int
     moyenne_classe: float | None
 
@@ -581,6 +582,8 @@ class InscriptionEnseignant(BaseModel):
 class InvitationEnvoyee(BaseModel):
     id: str
     enseignant_email: str
+    classe_nom: str | None = None
+    matiere_nom: str | None = None
     statut: str
     created_at: datetime
 
@@ -588,6 +591,8 @@ class InvitationEnvoyee(BaseModel):
 class InvitationRecue(BaseModel):
     id: str
     etablissement_nom: str
+    classe_nom: str | None = None
+    matiere_nom: str | None = None
     statut: str
     created_at: datetime
 

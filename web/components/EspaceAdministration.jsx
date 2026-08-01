@@ -1380,11 +1380,14 @@ function EcranDocuments({ token, classes, matieres }) {
 /*  Écran : Invitations (enseignants indépendants)                     */
 /* ------------------------------------------------------------------ */
 
-function EcranInvitations({ token }) {
+function EcranInvitations({ token, classes, matieres }) {
   const [invitations, setInvitations] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
   const [email, setEmail] = useState("");
+  const [typeInvitation, setTypeInvitation] = useState("rejoindre"); // "rejoindre" | "classe"
+  const [classeId, setClasseId] = useState("");
+  const [matiereId, setMatiereId] = useState(matieres[0]?.id || "");
   const [envoi, setEnvoi] = useState(false);
   const [succes, setSucces] = useState(null);
 
@@ -1399,7 +1402,8 @@ function EcranInvitations({ token }) {
     e.preventDefault();
     setEnvoi(true); setErreur(null); setSucces(null);
     try {
-      await apiFetch("/administration/invitations", { method: "POST", token, body: { email } });
+      const body = typeInvitation === "classe" ? { email, classe_id: classeId, matiere_id: matiereId } : { email };
+      await apiFetch("/administration/invitations", { method: "POST", token, body });
       setSucces(`Invitation envoyée à ${email}.`);
       setEmail("");
       charger();
@@ -1417,18 +1421,48 @@ function EcranInvitations({ token }) {
     <div className="max-w-2xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
       <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Invitations</h1>
       <p className="text-sm mb-8" style={{ color: C.encreDoux }}>
-        Invitez un enseignant déjà inscrit sur la plateforme de façon indépendante (sans établissement) à rejoindre le vôtre.
+        Invitez un enseignant déjà inscrit sur la plateforme à rejoindre votre établissement, ou simplement à enseigner
+        une classe précise chez vous — utile si son établissement principal est ailleurs (multi-établissement).
       </p>
 
       <BandeauErreur message={erreur} />
       <BandeauSucces message={succes} />
 
-      <form onSubmit={envoyer} className="rounded-2xl p-5 border flex gap-2 mb-6" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
-        <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email.enseignant@exemple.com"
-          className="eduai-focus flex-1 rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
-        <button type="submit" disabled={envoi} className="eduai-focus flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
-          {envoi ? <Loader2 size={12} className="eduai-spin" /> : <UserPlus size={13} />} Inviter
-        </button>
+      <form onSubmit={envoyer} className="rounded-2xl p-5 border space-y-3 mb-6" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+        <div className="flex gap-1 rounded-lg p-1" style={{ backgroundColor: C.fond }}>
+          <button type="button" onClick={() => setTypeInvitation("rejoindre")}
+            className="eduai-focus flex-1 rounded-md py-1.5 text-xs font-medium transition-colors"
+            style={typeInvitation === "rejoindre" ? { backgroundColor: C.surface, color: C.encre, boxShadow: "0 1px 3px rgba(0,0,0,0.08)" } : { color: C.encreAttenue }}>
+            Rejoindre l'établissement
+          </button>
+          <button type="button" onClick={() => setTypeInvitation("classe")}
+            className="eduai-focus flex-1 rounded-md py-1.5 text-xs font-medium transition-colors"
+            style={typeInvitation === "classe" ? { backgroundColor: C.surface, color: C.encre, boxShadow: "0 1px 3px rgba(0,0,0,0.08)" } : { color: C.encreAttenue }}>
+            Enseigner une classe précise
+          </button>
+        </div>
+
+        <div className="flex gap-2">
+          <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email.enseignant@exemple.com"
+            className="eduai-focus flex-1 rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
+          <button type="submit" disabled={envoi} className="eduai-focus flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
+            {envoi ? <Loader2 size={12} className="eduai-spin" /> : <UserPlus size={13} />} Inviter
+          </button>
+        </div>
+
+        {typeInvitation === "classe" && (
+          <div className="grid grid-cols-2 gap-2">
+            <select required value={classeId} onChange={(e) => setClasseId(e.target.value)}
+              className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}>
+              <option value="">Classe...</option>
+              {classes.map((c) => <option key={c.id} value={c.id}>{c.nom} ({c.niveau})</option>)}
+            </select>
+            <select required value={matiereId} onChange={(e) => setMatiereId(e.target.value)}
+              className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}>
+              {matieres.map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
+            </select>
+          </div>
+        )}
       </form>
 
       {chargement ? <Chargement /> : (
@@ -1437,7 +1471,10 @@ function EcranInvitations({ token }) {
             const badge = badgeStatut(inv.statut);
             return (
               <div key={inv.id} className="flex items-center justify-between rounded-lg border px-3 py-2.5" style={{ borderColor: C.ligne }}>
-                <span className="text-sm" style={{ color: C.encre }}>{inv.enseignant_email}</span>
+                <div>
+                  <p className="text-sm" style={{ color: C.encre }}>{inv.enseignant_email}</p>
+                  {inv.classe_nom && <p className="text-xs" style={{ color: C.encreAttenue }}>{inv.matiere_nom} · {inv.classe_nom}</p>}
+                </div>
                 <span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: badge.bg, color: badge.fg }}>{badge.label}</span>
               </div>
             );
@@ -1492,7 +1529,7 @@ export default function App() {
           {vue === "paiements" && <EcranPaiements token={token} />}
           {vue === "etablissement" && <EcranEtablissement token={token} classes={classes} matieres={matieres} />}
           {vue === "documents" && <EcranDocuments token={token} classes={classes} matieres={matieres} />}
-          {vue === "invitations" && <EcranInvitations token={token} />}
+          {vue === "invitations" && <EcranInvitations token={token} classes={classes} matieres={matieres} />}
         </>
       )}
     </div>

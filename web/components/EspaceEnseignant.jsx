@@ -497,7 +497,8 @@ function EcranMesClasses({ classes, chargement, erreur, setVue, setClasseActive 
                   </span>
                 </div>
                 <p className="text-xs font-medium mb-1.5" style={{ color: C.encreDoux }}>{cl.matiere}</p>
-                <p className="text-sm font-semibold mb-3" style={{ color: C.encre }}>{cl.nom}</p>
+                <p className="text-sm font-semibold mb-1" style={{ color: C.encre }}>{cl.nom}</p>
+                <p className="text-[11px] mb-3" style={{ color: C.encreAttenue }}>{cl.etablissement_nom}</p>
                 <div className="flex items-center gap-1.5 text-xs" style={{ color: C.accentFonce }}>
                   <TrendingUp size={12} /> Moyenne de classe : {cl.moyenne_classe === null ? "—" : `${cl.moyenne_classe}/20`}
                 </div>
@@ -1676,7 +1677,11 @@ function EcranInvitations({ token, onTraitee }) {
             <div key={inv.id} className="rounded-2xl p-5 border flex items-center justify-between" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
               <div>
                 <p className="text-sm font-semibold" style={{ color: C.encre }}>{inv.etablissement_nom}</p>
-                <p className="text-xs" style={{ color: C.encreAttenue }}>t'invite à rejoindre son établissement</p>
+                <p className="text-xs" style={{ color: C.encreAttenue }}>
+                  {inv.classe_nom
+                    ? `t'invite à enseigner ${inv.matiere_nom} en ${inv.classe_nom}`
+                    : "t'invite à rejoindre son établissement"}
+                </p>
               </div>
               <div className="flex gap-2">
                 <button onClick={() => repondre(inv.id, true)} disabled={enCours === inv.id}

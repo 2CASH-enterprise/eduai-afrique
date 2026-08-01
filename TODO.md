@@ -35,26 +35,32 @@ simultané reste le point 2 ci-dessous, pas encore traité.
 
 ---
 
-## 2. Un enseignant peut dispenser des cours dans plusieurs établissements
+## 2. Un enseignant peut dispenser des cours dans plusieurs établissements — ✅ FAIT le 01/08
 
 **Besoin exprimé** : un enseignant n'est pas forcément lié à une seule école.
 Dans "Mes classes", il faut alors afficher clairement le nom de
 l'établissement à côté de chaque classe, pour que l'enseignant s'y retrouve.
 
-**Implications techniques identifiées** :
-- Question d'architecture centrale, à trancher avant de coder quoi que ce
-  soit : est-ce qu'on garde `utilisateurs.etablissement_id` (un seul, comme
-  aujourd'hui) et qu'on gère le multi-établissement uniquement via
-  `affectations_enseignants` (qui pourrait porter sa propre notion
-  d'établissement par affectation) ? Ou est-ce qu'on a réellement besoin
-  d'une relation plusieurs-à-plusieurs entre enseignants et établissements ?
-- Si un enseignant travaille dans plusieurs écoles, ses identifiants de
-  connexion restent les mêmes partout (compte unique) — bien vérifier que
-  ça reste cohérent avec l'isolation stricte des données entre
-  établissements déjà en place ailleurs sur la plateforme.
-- Écran "Mes classes" (`/enseignant/mes-classes`) à mettre à jour pour
-  afficher le nom de l'établissement par classe, une fois l'architecture
-  ci-dessus décidée.
+**Construit et déployé** : la table `invitations_enseignants` porte
+désormais optionnellement une `classe_id`/`matiere_id`. Sans elles, c'est
+l'invitation "classique" à rejoindre un établissement (point 1, exclusive).
+Avec elles, c'est une invitation à enseigner cette classe précise —
+l'acceptation crée directement l'affectation, **sans jamais toucher
+l'établissement principal**, et sans limite de nombre. C'est ce qui permet
+concrètement le multi-établissement : un enseignant peut accepter autant
+d'invitations "classe précise" que nécessaire, dans autant d'établissements
+différents, tout en gardant un seul établissement principal.
+
+`GET /enseignant/mes-classes` affiche maintenant `etablissement_nom` pour
+chaque classe. Interfaces mises à jour des deux côtés (bascule "Rejoindre
+l'établissement" / "Enseigner une classe précise" côté Administration,
+libellé distinct côté Enseignant selon le type d'invitation reçue).
+
+**Bénéfice inattendu** : ce même mécanisme comble aussi une partie du point
+3 (aucun moyen d'ajouter une affectation à un enseignant déjà existant) —
+un établissement peut désormais affecter un enseignant à une nouvelle
+classe/matière chez lui aussi, pas seulement ailleurs, via ce même flux
+d'invitation.
 
 ---
 

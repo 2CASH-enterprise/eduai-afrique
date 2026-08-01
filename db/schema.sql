@@ -174,18 +174,24 @@ CREATE TABLE affectations_enseignants (
 CREATE INDEX idx_affectations_enseignant ON affectations_enseignants(enseignant_id);
 CREATE INDEX idx_affectations_classe ON affectations_enseignants(classe_id);
 
--- Invitation d'un enseignant indépendant (etablissement_id NULL) à
--- rejoindre un établissement. Portée V1 : un enseignant déjà rattaché à un
--- autre établissement ne peut pas être invité (multi-établissement
--- simultané = chantier séparé).
+-- Invitation d'un enseignant à rejoindre un établissement (classe_id ET
+-- matiere_id NULL), OU invitation à enseigner une classe précise sans
+-- devenir membre principal (les deux renseignés) — voir TODO.md points 1
+-- et 2. Portée V1 : un enseignant ne peut avoir qu'un seul établissement
+-- principal à la fois, mais un nombre illimité d'affectations "invitées"
+-- dans d'autres établissements.
 CREATE TABLE invitations_enseignants (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     etablissement_id    UUID NOT NULL REFERENCES etablissements(id) ON DELETE CASCADE,
     enseignant_id       UUID NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+    classe_id           UUID REFERENCES classes(id) ON DELETE CASCADE,
+    matiere_id          UUID REFERENCES matieres(id) ON DELETE CASCADE,
     statut              TEXT NOT NULL DEFAULT 'en_attente'
                         CHECK (statut IN ('en_attente', 'acceptee', 'refusee')),
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    traitee_at          TIMESTAMPTZ
+    traitee_at          TIMESTAMPTZ,
+    CONSTRAINT invitations_enseignants_classe_matiere_coherentes
+        CHECK ((classe_id IS NULL) = (matiere_id IS NULL))
 );
 CREATE INDEX idx_invitations_enseignant ON invitations_enseignants(enseignant_id);
 CREATE INDEX idx_invitations_etablissement ON invitations_enseignants(etablissement_id);
