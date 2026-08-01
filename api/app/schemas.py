@@ -402,6 +402,55 @@ class ClasseResume(BaseModel):
     niveau: str
 
 
+# ---------------------------------------------------------------------------
+# Structure scolaire (années scolaires, cycles, niveaux, classes) — jusqu'ici
+# toujours créée à la main en SQL, jamais via l'interface (TODO.md point 3).
+# ---------------------------------------------------------------------------
+
+class AnneeScolaireResume(BaseModel):
+    id: str
+    libelle: str
+    date_debut: str
+    date_fin: str
+    est_active: bool
+
+
+class CreationAnneeScolaire(BaseModel):
+    libelle: str
+    date_debut: str
+    date_fin: str
+
+
+class CycleResume(BaseModel):
+    id: str
+    nom: str
+    ordre: int
+
+
+class CreationCycle(BaseModel):
+    nom: str
+    ordre: int = 0
+
+
+class NiveauResume(BaseModel):
+    id: str
+    nom: str
+    ordre: int
+    cycle_id: str
+    cycle_nom: str
+
+
+class CreationNiveau(BaseModel):
+    cycle_id: str
+    nom: str
+    ordre: int = 0
+
+
+class CreationClasse(BaseModel):
+    niveau_id: str
+    nom: str
+
+
 class MatiereResume(BaseModel):
     id: str
     nom: str

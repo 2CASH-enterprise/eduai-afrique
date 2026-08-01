@@ -64,7 +64,7 @@ d'invitation.
 
 ---
 
-## 3. Structure classes/niveaux incomplète — bloque un vrai client (Collège Vogt)
+## 3. Structure classes/niveaux incomplète — ✅ FAIT le 01/08 (bloquait Collège Vogt)
 
 **Constat, diagnostiqué le 31/07** : `cycles` et `niveaux` sont des tables
 **propres à chaque établissement** (pas globales, contrairement à
@@ -74,19 +74,16 @@ en base — d'où le symptôme observé : impossible de créer une classe sur un
 autre niveau, ce niveau unique apparaît partout où un choix de classe est
 attendu.
 
-**Cause racine** : il n'existe **aucun endpoint ni écran** pour qu'un
-établissement crée lui-même ses cycles/niveaux/classes. Jusqu'ici, toujours
-fait à la main en SQL par nous (pour "École Test" puis "Collège Vogt").
+**Construit et déployé** : nouveau module `structure_scolaire.py` — un
+établissement peut désormais créer lui-même ses années scolaires, cycles,
+niveaux et classes via l'interface (`/administration` → onglet
+"Structure"), sans plus jamais dépendre de nous en SQL manuel. Chaîne
+complète testée de bout en bout sur un établissement entièrement neuf
+(année scolaire → cycle → niveau → classe).
 
-**Décision prise le 31/07** : ne pas corriger dans l'urgence — ajouté à
-cette liste, à traiter dans une prochaine session. Le déblocage immédiat de
-Collège Vogt (ajout manuel en SQL des niveaux/classes manquants) reste
-possible à la demande en attendant.
-
-**À construire** : écran + endpoints (`POST /administration/cycles`,
-`/administration/niveaux`, et l'écran de création de classe qui manque déjà
-aussi) pour qu'un établissement structure lui-même son organisation
-scolaire, sans dépendre de nous.
+**Pour débloquer concrètement Collège Vogt** : se connecter avec un compte
+administratif de cet établissement, aller dans Structure, et ajouter les
+niveaux manquants (5ème, 4ème, 3ème...) puis leurs classes.
 
 ---
 

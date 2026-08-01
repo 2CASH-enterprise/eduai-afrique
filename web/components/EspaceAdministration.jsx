@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   GraduationCap, Lock, Mail, LogOut, Bell, Loader2, AlertTriangle,
   Users, Plus, UserX, ScrollText, Send, Wallet, Check, Copy, Upload, FileSpreadsheet, Download,
-  FileText, Trash2, BookMarked, UserPlus,
+  FileText, Trash2, BookMarked, UserPlus, Layers, Calendar, School,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -164,6 +164,7 @@ function BarreNav({ vue, setVue, onDeconnexion }) {
     { id: "notifications", label: "Notifications" },
     { id: "paiements", label: "Paiements" },
     { id: "etablissement", label: "Établissement" },
+    { id: "structure", label: "Structure" },
     { id: "documents", label: "Documents" },
     { id: "invitations", label: "Invitations" },
   ];
@@ -1487,6 +1488,266 @@ function EcranInvitations({ token, classes, matieres }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Écran : Structure scolaire (années, cycles, niveaux, classes)      */
+/* ------------------------------------------------------------------ */
+
+function BlocCreation({ ouvert, setOuvert, label, children, onSubmit, envoi }) {
+  if (!ouvert) {
+    return (
+      <button onClick={() => setOuvert(true)} className="eduai-focus flex items-center gap-1.5 text-xs font-medium" style={{ color: C.accentFonce }}>
+        <Plus size={13} /> {label}
+      </button>
+    );
+  }
+  return (
+    <form onSubmit={onSubmit} className="rounded-lg p-4 border space-y-2.5" style={{ borderColor: C.ligne, backgroundColor: C.fond }}>
+      {children}
+      <div className="flex gap-2 pt-1">
+        <button type="submit" disabled={envoi} className="eduai-focus rounded-lg px-3.5 py-2 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
+          {envoi ? <Loader2 size={12} className="eduai-spin" /> : "Créer"}
+        </button>
+        <button type="button" onClick={() => setOuvert(false)} className="eduai-focus text-xs font-medium" style={{ color: C.encreDoux }}>Annuler</button>
+      </div>
+    </form>
+  );
+}
+
+const champStyle = { borderColor: C.ligne, backgroundColor: C.surface, color: C.encre };
+
+function SectionAnneesScolaires({ token, annees, onCree }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [libelle, setLibelle] = useState("");
+  const [debut, setDebut] = useState("");
+  const [fin, setFin] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState(null);
+
+  async function soumettre(e) {
+    e.preventDefault();
+    setEnvoi(true); setErreur(null);
+    try {
+      await apiFetch("/administration/annees-scolaires", { method: "POST", token, body: { libelle, date_debut: debut, date_fin: fin } });
+      setLibelle(""); setDebut(""); setFin(""); setOuvert(false);
+      onCree();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoi(false); }
+  }
+
+  return (
+    <div className="rounded-2xl p-6 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+      <div className="flex items-center gap-2 mb-4">
+        <Calendar size={16} color={C.encre} />
+        <h2 className="eduai-display text-lg" style={{ color: C.encre }}>Années scolaires</h2>
+      </div>
+      <p className="text-xs mb-4" style={{ color: C.encreAttenue }}>Une nouvelle année devient automatiquement l'année active — nécessaire pour créer des classes.</p>
+      <BandeauErreur message={erreur} />
+      <BlocCreation ouvert={ouvert} setOuvert={setOuvert} label="Ajouter une année scolaire" onSubmit={soumettre} envoi={envoi}>
+        <input required value={libelle} onChange={(e) => setLibelle(e.target.value)} placeholder="Libellé (ex : 2026-2027)"
+          className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle} />
+        <div className="grid grid-cols-2 gap-2">
+          <input required type="date" value={debut} onChange={(e) => setDebut(e.target.value)}
+            className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle} />
+          <input required type="date" value={fin} onChange={(e) => setFin(e.target.value)}
+            className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle} />
+        </div>
+      </BlocCreation>
+      <div className="space-y-1.5 mt-4">
+        {annees.map((a) => (
+          <div key={a.id} className="flex items-center justify-between text-sm px-1">
+            <span style={{ color: C.encre }}>{a.libelle}</span>
+            {a.est_active && <span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: C.vertFond, color: C.vert }}>Active</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SectionCycles({ token, cycles, onCree }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [nom, setNom] = useState("");
+  const [ordre, setOrdre] = useState(1);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState(null);
+
+  async function soumettre(e) {
+    e.preventDefault();
+    setEnvoi(true); setErreur(null);
+    try {
+      await apiFetch("/administration/cycles", { method: "POST", token, body: { nom, ordre: Number(ordre) } });
+      setNom(""); setOuvert(false);
+      onCree();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoi(false); }
+  }
+
+  return (
+    <div className="rounded-2xl p-6 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+      <div className="flex items-center gap-2 mb-4">
+        <Layers size={16} color={C.encre} />
+        <h2 className="eduai-display text-lg" style={{ color: C.encre }}>Cycles</h2>
+      </div>
+      <p className="text-xs mb-4" style={{ color: C.encreAttenue }}>Ex : "Premier Cycle" (6ème–3ème), "Second Cycle" (2nde–Terminale).</p>
+      <BandeauErreur message={erreur} />
+      <BlocCreation ouvert={ouvert} setOuvert={setOuvert} label="Ajouter un cycle" onSubmit={soumettre} envoi={envoi}>
+        <input required value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom (ex : Premier Cycle)"
+          className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle} />
+        <input required type="number" value={ordre} onChange={(e) => setOrdre(e.target.value)} placeholder="Ordre d'affichage"
+          className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle} />
+      </BlocCreation>
+      <div className="space-y-1.5 mt-4">
+        {cycles.map((c) => <div key={c.id} className="text-sm px-1" style={{ color: C.encre }}>{c.nom}</div>)}
+      </div>
+    </div>
+  );
+}
+
+function SectionNiveaux({ token, niveaux, cycles, onCree }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [nom, setNom] = useState("");
+  const [ordre, setOrdre] = useState(1);
+  const [cycleId, setCycleId] = useState(cycles[0]?.id || "");
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState(null);
+
+  async function soumettre(e) {
+    e.preventDefault();
+    setEnvoi(true); setErreur(null);
+    try {
+      await apiFetch("/administration/niveaux", { method: "POST", token, body: { cycle_id: cycleId, nom, ordre: Number(ordre) } });
+      setNom(""); setOuvert(false);
+      onCree();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoi(false); }
+  }
+
+  return (
+    <div className="rounded-2xl p-6 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+      <div className="flex items-center gap-2 mb-4">
+        <BookMarked size={16} color={C.encre} />
+        <h2 className="eduai-display text-lg" style={{ color: C.encre }}>Niveaux</h2>
+      </div>
+      <p className="text-xs mb-4" style={{ color: C.encreAttenue }}>Ex : "6ème", "5ème", "Terminale D"...</p>
+      <BandeauErreur message={erreur} />
+      {cycles.length === 0 ? (
+        <p className="text-xs" style={{ color: C.encreAttenue }}>Créez d'abord un cycle ci-contre.</p>
+      ) : (
+        <BlocCreation ouvert={ouvert} setOuvert={setOuvert} label="Ajouter un niveau" onSubmit={soumettre} envoi={envoi}>
+          <select value={cycleId} onChange={(e) => setCycleId(e.target.value)} required
+            className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle}>
+            {cycles.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
+          </select>
+          <input required value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom (ex : 5ème)"
+            className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle} />
+          <input required type="number" value={ordre} onChange={(e) => setOrdre(e.target.value)} placeholder="Ordre d'affichage"
+            className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle} />
+        </BlocCreation>
+      )}
+      <div className="space-y-1.5 mt-4">
+        {niveaux.map((n) => (
+          <div key={n.id} className="flex items-center justify-between text-sm px-1">
+            <span style={{ color: C.encre }}>{n.nom}</span>
+            <span className="text-xs" style={{ color: C.encreAttenue }}>{n.cycle_nom}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SectionClasses({ token, classesStructure, niveaux, onCree }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [nom, setNom] = useState("");
+  const [niveauId, setNiveauId] = useState(niveaux[0]?.id || "");
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState(null);
+
+  async function soumettre(e) {
+    e.preventDefault();
+    setEnvoi(true); setErreur(null);
+    try {
+      await apiFetch("/administration/classes", { method: "POST", token, body: { niveau_id: niveauId, nom } });
+      setNom(""); setOuvert(false);
+      onCree();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoi(false); }
+  }
+
+  return (
+    <div className="rounded-2xl p-6 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+      <div className="flex items-center gap-2 mb-4">
+        <School size={16} color={C.encre} />
+        <h2 className="eduai-display text-lg" style={{ color: C.encre }}>Classes</h2>
+      </div>
+      <p className="text-xs mb-4" style={{ color: C.encreAttenue }}>Ex : "6ème A", "5ème B"... Nécessite une année scolaire active.</p>
+      <BandeauErreur message={erreur} />
+      {niveaux.length === 0 ? (
+        <p className="text-xs" style={{ color: C.encreAttenue }}>Créez d'abord un niveau ci-contre.</p>
+      ) : (
+        <BlocCreation ouvert={ouvert} setOuvert={setOuvert} label="Ajouter une classe" onSubmit={soumettre} envoi={envoi}>
+          <select value={niveauId} onChange={(e) => setNiveauId(e.target.value)} required
+            className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle}>
+            {niveaux.map((n) => <option key={n.id} value={n.id}>{n.nom}</option>)}
+          </select>
+          <input required value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom (ex : 6ème A)"
+            className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle} />
+        </BlocCreation>
+      )}
+      <div className="space-y-1.5 mt-4">
+        {classesStructure.map((c) => (
+          <div key={c.id} className="flex items-center justify-between text-sm px-1">
+            <span style={{ color: C.encre }}>{c.nom}</span>
+            <span className="text-xs" style={{ color: C.encreAttenue }}>{c.niveau}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EcranStructure({ token }) {
+  const [annees, setAnnees] = useState([]);
+  const [cycles, setCycles] = useState([]);
+  const [niveaux, setNiveaux] = useState([]);
+  const [classesStructure, setClassesStructure] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+
+  const charger = useCallback(() => {
+    setChargement(true); setErreur(null);
+    Promise.all([
+      apiFetch("/administration/annees-scolaires", { token }),
+      apiFetch("/administration/cycles", { token }),
+      apiFetch("/administration/niveaux", { token }),
+      apiFetch("/administration/classes", { token }),
+    ]).then(([a, c, n, cl]) => { setAnnees(a); setCycles(c); setNiveaux(n); setClassesStructure(cl); })
+      .catch((e) => setErreur(e.message)).finally(() => setChargement(false));
+  }, [token]);
+
+  useEffect(() => { charger(); }, [charger]);
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
+      <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Structure de l'établissement</h1>
+      <p className="text-sm mb-8" style={{ color: C.encreDoux }}>
+        Organisez vos années scolaires, cycles, niveaux et classes — la base sur laquelle reposent élèves, notes et bulletins.
+      </p>
+
+      <BandeauErreur message={erreur} />
+
+      {chargement ? <Chargement /> : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <SectionAnneesScolaires token={token} annees={annees} onCree={charger} />
+          <SectionCycles token={token} cycles={cycles} onCree={charger} />
+          <SectionNiveaux token={token} niveaux={niveaux} cycles={cycles} onCree={charger} />
+          <SectionClasses token={token} classesStructure={classesStructure} niveaux={niveaux} onCree={charger} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Application                                                        */
 /* ------------------------------------------------------------------ */
 
@@ -1528,6 +1789,7 @@ export default function App() {
           {vue === "notifications" && <EcranNotificationsDiffusion token={token} classes={classes} />}
           {vue === "paiements" && <EcranPaiements token={token} />}
           {vue === "etablissement" && <EcranEtablissement token={token} classes={classes} matieres={matieres} />}
+          {vue === "structure" && <EcranStructure token={token} />}
           {vue === "documents" && <EcranDocuments token={token} classes={classes} matieres={matieres} />}
           {vue === "invitations" && <EcranInvitations token={token} classes={classes} matieres={matieres} />}
         </>
