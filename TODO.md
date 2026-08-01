@@ -178,10 +178,29 @@ dessus serait un chantier séparé.
 
 ## 8. CI/CD — déploiement automatique à chaque push
 
-Mentionné plusieurs fois au fil des sessions comme prochaine étape
-logique, jamais commencé. Objectif : GitHub Actions (ou équivalent) pour
-automatiser ce qui est fait à la main aujourd'hui à chaque déploiement
-(scp, extraction, migration, redémarrage des services).
+**Plan clarifié le 01/08, pas encore construit** : GitHub Actions, avec un
+geste de validation manuelle avant tout déploiement en production (décision
+volontaire — pas d'auto-déploiement complet sans validation, projet avec
+de vrais utilisateurs).
+
+**Flux retenu** :
+1. Automatique à chaque push sur `main` : vérifier que le frontend build
+   sans erreur, et que le code de l'API s'importe proprement (sans base de
+   données réelle pour cette V1 — un test complet avec la base demanderait
+   une configuration plus lourde, à envisager plus tard si besoin).
+2. Si ça casse → tout s'arrête, rien ne touche le serveur.
+3. Si ça passe → un bouton "Déployer" apparaît sur GitHub (environnement
+   `production` avec validateur requis), à cliquer manuellement.
+4. Une fois cliqué → automatique : connexion SSH au serveur, récupération
+   du code, migration si besoin, rebuild, redémarrage des services.
+
+**Configuration initiale nécessaire avant de pouvoir construire ça**
+(remise à plus tard, décision du 01/08) :
+- Générer une clé SSH dédiée (pas la clé personnelle) pour que GitHub
+  Actions puisse se connecter au serveur.
+- L'ajouter comme secret dans les paramètres du dépôt GitHub.
+- Créer un environnement GitHub nommé `production`, avec validateur requis
+  — c'est ce qui crée le bouton de validation manuelle.
 
 ---
 
