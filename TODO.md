@@ -235,6 +235,47 @@ insuffisants), gain automatique à la validation dans `cours.py`, endpoint
 
 ---
 
+## 12. Vrai système d'abonnement établissement (pas encore fonctionnel)
+
+**Contexte, précisé le 01/08** : le modèle économique complet a trois
+niveaux — établissement (abonnement classique, donne accès à ses
+enseignants/parents/élèves), enseignant (crédits, point 11, fait),
+et élève (upgrade payant par le parent, point 13, à faire). Ce point
+couvre le premier niveau.
+
+**Constat** : `etablissements.niveau_abonnement` existe déjà en base
+(renseigné à la création d'un établissement via l'Admin Plateforme), mais
+c'est **une simple étiquette aujourd'hui** — rien dans le code ne
+vérifie sa valeur ni n'applique de restriction en fonction d'elle. Un
+établissement en formule "starter" a exactement les mêmes droits qu'un
+établissement en formule supérieure.
+
+**À définir avant de coder** : quelles formules existent réellement (ex :
+starter/standard/premium ?), ce que chacune inclut ou limite concrètement
+(nombre d'élèves ? nombre d'enseignants ? accès à certains modules comme
+Documents ou Bibliothèque commune ?), et comment un établissement change
+de formule (upgrade/downgrade — qui déclenche ça, l'Admin Plateforme ?).
+
+---
+
+## 13. Upgrade du compte élève par le parent (n'existe pas encore)
+
+**Besoin exprimé le 01/08** : un parent doit pouvoir payer pour débloquer
+plus de services sur le compte de son enfant, au-delà de ce que la formule
+classique de l'établissement offre par défaut.
+
+**État actuel** : n'existe pas du tout — ni dans le schéma, ni dans le
+code, ni dans les discussions précédentes. Tout un chantier à cadrer :
+quels services précis un élève "de base" a aujourd'hui (exercices,
+planning, résultats — voir `/eleve/...`) versus ce qu'un upgrade
+débloquerait concrètement (génération d'exercices supplémentaires ? accès
+à du contenu plus avancé ? autre chose ?). Question de paiement à trancher
+aussi : paiement ponctuel, abonnement récurrent, et par quel moyen (le
+module `paiements` existe déjà côté établissement, à voir s'il est
+réutilisable ou s'il faut un circuit séparé pour les parents).
+
+---
+
 ## 9. Déposer les vrais programmes officiels MINESEC
 
 Une fois récupérés par l'utilisateur (le site du MINESEC bloque l'accès
