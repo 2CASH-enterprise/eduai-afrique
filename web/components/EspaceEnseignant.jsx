@@ -395,7 +395,7 @@ function EcranAccueil({ setVue, enAttente, historique, cours, classes }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
         <button
-          onClick={() => setVue("deposer-cours")}
+          onClick={() => setVue(classes.length === 0 ? "generation-libre" : "deposer-cours")}
           className="eduai-focus text-left rounded-xl p-6 transition-transform hover:-translate-y-0.5"
           style={{ backgroundColor: C.encre, boxShadow: C.surfaceOmbre }}
         >
@@ -804,7 +804,7 @@ function EcranEleveDetail({ eleveActif, classeActive, token, setVue }) {
 /*  Écran : Mes cours                                                   */
 /* ------------------------------------------------------------------ */
 
-function EcranMesCours({ cours, chargement, erreur, setVue, setCoursActifId }) {
+function EcranMesCours({ cours, chargement, erreur, setVue, setCoursActifId, classes }) {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
       <div className="flex items-center justify-between mb-8">
@@ -812,7 +812,7 @@ function EcranMesCours({ cours, chargement, erreur, setVue, setCoursActifId }) {
           <h1 className="eduai-display text-3xl mb-1" style={{ color: C.encre }}>Mes cours</h1>
           <p className="text-sm" style={{ color: C.encreDoux }}>{cours.length} cours déposés dans ta banque personnelle.</p>
         </div>
-        <button onClick={() => setVue("deposer-cours")} className="eduai-focus flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold" style={{ backgroundColor: C.encre, color: C.surface }}>
+        <button onClick={() => setVue(classes.length === 0 ? "generation-libre" : "deposer-cours")} className="eduai-focus flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold" style={{ backgroundColor: C.encre, color: C.surface }}>
           <Plus size={15} /> Déposer un cours
         </button>
       </div>
@@ -1802,7 +1802,7 @@ export default function App() {
           <BarreNav vue={vue} setVue={setVue} onDeconnexion={deconnecter} nombreEnAttente={enAttente.length} nombreInvitations={nombreInvitations} />
           {vue === "accueil" && <EcranAccueil setVue={setVue} enAttente={enAttente} historique={historique} cours={cours} classes={classes} />}
 
-          {vue === "mes-cours" && <EcranMesCours cours={cours} chargement={chargementCours} erreur={erreurCours} setVue={setVue} setCoursActifId={setCoursActifId} />}
+          {vue === "mes-cours" && <EcranMesCours cours={cours} chargement={chargementCours} erreur={erreurCours} setVue={setVue} setCoursActifId={setCoursActifId} classes={classes} />}
           {vue === "deposer-cours" && <EcranDeposerCours classes={classes} token={token} setVue={setVue} onCoursDepose={onCoursDepose} />}
           {vue === "cours-detail" && coursActifId && <EcranCoursDetail coursId={coursActifId} token={token} setVue={setVue} />}
           {vue === "generation-libre" && <EcranGenerationLibre token={token} />}
