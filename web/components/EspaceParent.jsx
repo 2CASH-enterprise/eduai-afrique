@@ -13,7 +13,12 @@ import {
 
 const API_BASE_URL = "http://89.116.111.3:8000";
 
-class ErreurApi extends Error {}
+class ErreurApi extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+}
 
 async function apiFetch(path, { method = "GET", token, body, params } = {}) {
   let url = `${API_BASE_URL}${path}`;
@@ -38,7 +43,7 @@ async function apiFetch(path, { method = "GET", token, body, params } = {}) {
   try { donnees = await reponse.json(); } catch { /* corps vide */ }
   if (!reponse.ok) {
     const message = donnees?.detail || `Erreur ${reponse.status}`;
-    throw new ErreurApi(typeof message === "string" ? message : JSON.stringify(message));
+    throw new ErreurApi(typeof message === "string" ? message : JSON.stringify(message), reponse.status);
   }
   return donnees;
 }
@@ -489,7 +494,7 @@ function EcranNotifications({ token }) {
 /*  Application                                                        */
 /* ------------------------------------------------------------------ */
 
-export default function EspaceParent() {
+export default function App() {
   const [token, setToken] = useState(null);
   const [connexionEnCours, setConnexionEnCours] = useState(false);
   const [erreurConnexion, setErreurConnexion] = useState(null);
@@ -516,7 +521,10 @@ export default function EspaceParent() {
     setChargementEnfants(true);
     apiFetch("/parent/enfants", { token })
       .then((d) => { setEnfants(d); if (d.length) setEnfantActif(d[0]); })
-      .catch((e) => setErreurEnfants(e.message))
+      .catch((e) => {
+        if (e.status === 401) { setToken(null); setErreurConnexion("Ce compte n'a pas accès à cet espace."); }
+        else setErreurEnfants(e.message);
+      })
       .finally(() => setChargementEnfants(false));
   }, [token]);
 

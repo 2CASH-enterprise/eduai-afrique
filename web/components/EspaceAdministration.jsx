@@ -13,7 +13,12 @@ import {
 
 const API_BASE_URL = "http://89.116.111.3:8000";
 
-class ErreurApi extends Error {}
+class ErreurApi extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+}
 
 async function apiFetch(path, { method = "GET", token, body, params } = {}) {
   let url = `${API_BASE_URL}${path}`;
@@ -45,7 +50,7 @@ async function apiFetch(path, { method = "GET", token, body, params } = {}) {
   try { donnees = await reponse.json(); } catch { /* corps vide */ }
   if (!reponse.ok) {
     const message = donnees?.detail || `Erreur ${reponse.status}`;
-    throw new ErreurApi(typeof message === "string" ? message : JSON.stringify(message));
+    throw new ErreurApi(typeof message === "string" ? message : JSON.stringify(message), reponse.status);
   }
   return donnees;
 }
@@ -1763,8 +1768,11 @@ export default function App() {
     setConnexionEnCours(true); setErreurConnexion(null);
     try {
       const { access_token } = await apiFetch("/auth/login", { method: "POST", body: { email, mot_de_passe: motDePasse } });
+      await apiFetch("/administration/matieres", { token: access_token });
       setToken(access_token);
-    } catch (e) { setErreurConnexion(e.message); }
+    } catch (e) {
+      setErreurConnexion(e.status === 401 ? "Ce compte n'a pas accès à cet espace." : e.message);
+    }
     finally { setConnexionEnCours(false); }
   }
 

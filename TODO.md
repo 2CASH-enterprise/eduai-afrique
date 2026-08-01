@@ -121,7 +121,7 @@ d'aide sous le champ).
 
 ---
 
-## 6. Les identifiants d'un module ouvrent (partiellement) les autres modules
+## 6. Les identifiants d'un module "ouvrent" partiellement les autres modules — ✅ FAIT le 01/08
 
 **Constat** : `/auth/login` est volontairement générique (ne vérifie que
 email/mot de passe, jamais le rôle — chaque endpoint revérifie le rôle côté
@@ -132,11 +132,14 @@ spécifique). Pas de faille de sécurité de fond, mais une mauvaise
 expérience : l'utilisateur se retrouve sur un écran vide/cassé au lieu d'un
 message clair.
 
-**Correctif identifié** : après connexion, chaque espace frontend doit
-vérifier immédiatement (via un appel léger, ex. le premier chargement de
-données du module) que le compte correspond bien au bon rôle, et afficher
-"Ce compte n'a pas accès à cet espace" plutôt que de laisser entrer sur un
-écran cassé.
+**Construit et déployé** : `ErreurApi` porte désormais le code HTTP de la
+réponse (`e.status`) dans les 6 espaces. Si le tout premier appel
+authentifié échoue en 401, le token n'est jamais posé (ou aussitôt retiré) —
+l'utilisateur reste sur l'écran de connexion avec le message "Ce compte n'a
+pas accès à cet espace", plutôt que de voir un tableau de bord vide ou
+cassé. Selon l'architecture de chaque espace : vérification directe dans
+`connecter()` (Enseignant, Administration, Direction, Plateforme) ou
+interception dans le `catch` du premier chargement (Élève, Parent).
 
 ---
 

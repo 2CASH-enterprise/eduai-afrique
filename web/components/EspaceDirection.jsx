@@ -13,7 +13,12 @@ import {
 
 const API_BASE_URL = "http://89.116.111.3:8000";
 
-class ErreurApi extends Error {}
+class ErreurApi extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+}
 
 async function apiFetch(path, { method = "GET", token, body, params } = {}) {
   let url = `${API_BASE_URL}${path}`;
@@ -38,7 +43,7 @@ async function apiFetch(path, { method = "GET", token, body, params } = {}) {
   try { donnees = await reponse.json(); } catch { /* corps vide */ }
   if (!reponse.ok) {
     const message = donnees?.detail || `Erreur ${reponse.status}`;
-    throw new ErreurApi(typeof message === "string" ? message : JSON.stringify(message));
+    throw new ErreurApi(typeof message === "string" ? message : JSON.stringify(message), reponse.status);
   }
   return donnees;
 }
@@ -446,7 +451,7 @@ function EcranPaiements({ token }) {
 /*  Application                                                        */
 /* ------------------------------------------------------------------ */
 
-export default function EspaceDirection() {
+export default function App() {
   const [token, setToken] = useState(null);
   const [connexionEnCours, setConnexionEnCours] = useState(false);
   const [erreurConnexion, setErreurConnexion] = useState(null);
@@ -456,8 +461,15 @@ export default function EspaceDirection() {
     setConnexionEnCours(true); setErreurConnexion(null);
     try {
       const { access_token } = await apiFetch("/auth/login", { method: "POST", body: { email, mot_de_passe: motDePasse } });
+      // Chaque écran de cet espace charge ses propres données séparément
+      // (pas de chargement central) — on vérifie donc le rôle ici, avant
+      // d'afficher quoi que ce soit, plutôt que de laisser un écran
+      // potentiellement cassé apparaître après coup.
+      await apiFetch("/direction/tableau-de-bord", { token: access_token });
       setToken(access_token);
-    } catch (e) { setErreurConnexion(e.message); }
+    } catch (e) {
+      setErreurConnexion(e.status === 401 ? "Ce compte n'a pas accès à cet espace." : e.message);
+    }
     finally { setConnexionEnCours(false); }
   }
 
