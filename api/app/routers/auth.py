@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, status
 
 from ..db import get_cursor
-from ..security import verifier_mot_de_passe, creer_token_acces
-from ..schemas import DemandeConnexion, ReponseToken
+from ..security import verifier_mot_de_passe, hacher_mot_de_passe, creer_token_acces
+from ..schemas import DemandeConnexion, ReponseToken, InscriptionEnseignant
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -39,5 +39,34 @@ def login(payload: DemandeConnexion):
     utilisateur_id, mot_de_passe_hash = row
     if not verifier_mot_de_passe(payload.mot_de_passe, mot_de_passe_hash):
         raise erreur
+
+    return ReponseToken(access_token=creer_token_acces(utilisateur_id))
+
+
+@router.post("/inscription-enseignant", response_model=ReponseToken, status_code=status.HTTP_201_CREATED)
+def inscription_enseignant(payload: InscriptionEnseignant):
+    """Seul rôle qui peut s'auto-inscrire sans dépendre d'un établissement
+    (voir TODO.md point 1) — pense aux enseignants dont l'école n'est pas
+    encore cliente de la plateforme. Le compte est créé avec
+    etablissement_id = NULL ; il pourra rejoindre un établissement plus
+    tard via une invitation (voir routers/invitations.py). Connecte
+    automatiquement après inscription, comme le reste de la plateforme ne
+    demande jamais une double étape inscription→connexion séparée."""
+    with get_cursor(commit=True) as cur:
+        cur.execute("SELECT 1 FROM utilisateurs WHERE email = %s", (payload.email,))
+        if cur.fetchone() is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cet email est déjà utilisé")
+
+        cur.execute(
+            """
+            INSERT INTO utilisateurs (etablissement_id, role, email, mot_de_passe_hash, nom, prenom)
+            VALUES (NULL, 'enseignant', %s, %s, %s, %s)
+            RETURNING id
+            """,
+            (payload.email, hacher_mot_de_passe(payload.mot_de_passe), payload.nom, payload.prenom),
+        )
+        utilisateur_id = cur.fetchone()[0]
+        cur.execute("INSERT INTO enseignants (utilisateur_id, specialite) VALUES (%s, %s)",
+                     (utilisateur_id, payload.specialite))
 
     return ReponseToken(access_token=creer_token_acces(utilisateur_id))

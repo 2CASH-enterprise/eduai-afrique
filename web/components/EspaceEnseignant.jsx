@@ -218,9 +218,19 @@ function ChipMatiere({ label, active, onClick, icon: Icon }) {
 /*  Écran : Connexion                                                   */
 /* ------------------------------------------------------------------ */
 
-function EcranConnexion({ onConnexion, connexionEnCours, erreurConnexion }) {
+function EcranConnexion({ onConnexion, onInscription, connexionEnCours, erreurConnexion }) {
+  const [mode, setMode] = useState("connexion"); // "connexion" | "inscription"
   const [email, setEmail] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
+  const [nom, setNom] = useState("");
+  const [prenom, setPrenom] = useState("");
+  const [specialite, setSpecialite] = useState("");
+
+  function soumettre(e) {
+    e.preventDefault();
+    if (mode === "connexion") onConnexion(email, motDePasse);
+    else onInscription({ email, mot_de_passe: motDePasse, nom, prenom, specialite: specialite || null });
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6 eduai-root" style={{ backgroundColor: C.fond }}>
@@ -234,11 +244,34 @@ function EcranConnexion({ onConnexion, connexionEnCours, erreurConnexion }) {
 
         <div className="rounded-2xl p-8 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
           <h1 className="eduai-display text-xl mb-1" style={{ color: C.encre }}>Espace Enseignant</h1>
-          <p className="text-sm mb-7" style={{ color: C.encreDoux }}>Connecte-toi pour préparer tes cours.</p>
+          <p className="text-sm mb-5" style={{ color: C.encreDoux }}>
+            {mode === "connexion" ? "Connecte-toi pour préparer tes cours." : "Ton établissement n'est pas encore inscrit ? Crée un compte indépendant."}
+          </p>
+
+          <div className="flex gap-1 mb-6 rounded-lg p-1" style={{ backgroundColor: C.fond }}>
+            <button type="button" onClick={() => setMode("connexion")}
+              className="eduai-focus flex-1 rounded-md py-1.5 text-xs font-medium transition-colors"
+              style={mode === "connexion" ? { backgroundColor: C.surface, color: C.encre, boxShadow: "0 1px 3px rgba(0,0,0,0.08)" } : { color: C.encreAttenue }}>
+              Se connecter
+            </button>
+            <button type="button" onClick={() => setMode("inscription")}
+              className="eduai-focus flex-1 rounded-md py-1.5 text-xs font-medium transition-colors"
+              style={mode === "inscription" ? { backgroundColor: C.surface, color: C.encre, boxShadow: "0 1px 3px rgba(0,0,0,0.08)" } : { color: C.encreAttenue }}>
+              Compte indépendant
+            </button>
+          </div>
 
           <BandeauErreur message={erreurConnexion} />
 
-          <form onSubmit={(e) => { e.preventDefault(); onConnexion(email, motDePasse); }} className="space-y-4">
+          <form onSubmit={soumettre} className="space-y-4">
+            {mode === "inscription" && (
+              <div className="grid grid-cols-2 gap-2">
+                <input required value={prenom} onChange={(e) => setPrenom(e.target.value)} placeholder="Prénom"
+                  className="eduai-focus rounded-lg px-3.5 py-2.5 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
+                <input required value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom"
+                  className="eduai-focus rounded-lg px-3.5 py-2.5 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
+              </div>
+            )}
             <label className="block">
               <span className="text-xs font-medium mb-1.5 flex items-center gap-1.5" style={{ color: C.encreDoux }}>
                 <Mail size={13} /> Adresse email
@@ -261,6 +294,10 @@ function EcranConnexion({ onConnexion, connexionEnCours, erreurConnexion }) {
                 style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}
               />
             </label>
+            {mode === "inscription" && (
+              <input value={specialite} onChange={(e) => setSpecialite(e.target.value)} placeholder="Spécialité (optionnel, ex : Mathématiques)"
+                className="eduai-focus w-full rounded-lg px-3.5 py-2.5 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
+            )}
 
             <button
               type="submit" disabled={connexionEnCours}
@@ -268,9 +305,14 @@ function EcranConnexion({ onConnexion, connexionEnCours, erreurConnexion }) {
               style={{ backgroundColor: C.encre, color: C.surface }}
             >
               {connexionEnCours && <Loader2 size={14} className="eduai-spin" />}
-              Se connecter
+              {mode === "connexion" ? "Se connecter" : "Créer mon compte"}
             </button>
           </form>
+          {mode === "inscription" && (
+            <p className="text-xs mt-4" style={{ color: C.encreAttenue }}>
+              Utilisable dès maintenant pour préparer tes cours en mode libre. Si ton établissement rejoint la plateforme plus tard, il pourra t'inviter à le rejoindre.
+            </p>
+          )}
         </div>
 
         <p className="text-center text-xs mt-6" style={{ color: C.encreAttenue }}>
@@ -285,12 +327,14 @@ function EcranConnexion({ onConnexion, connexionEnCours, erreurConnexion }) {
 /*  Barre de navigation                                                */
 /* ------------------------------------------------------------------ */
 
-function BarreNav({ vue, setVue, onDeconnexion, nombreEnAttente }) {
+function BarreNav({ vue, setVue, onDeconnexion, nombreEnAttente, nombreInvitations }) {
   const items = [
     { id: "accueil", label: "Accueil" },
     { id: "mes-cours", label: "Mes cours" },
     { id: "mes-classes", label: "Mes classes" },
     { id: "mes-documents", label: "Mes documents" },
+    { id: "generation-libre", label: "Génération libre" },
+    { id: "invitations", label: "Invitations", badge: nombreInvitations },
     { id: "file", label: "À valider", badge: nombreEnAttente },
     { id: "historique", label: "Historique" },
   ];
@@ -1505,6 +1549,155 @@ function EcranMesDocuments({ token, classes }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Écran : Génération libre (sans classe, sans établissement)         */
+/* ------------------------------------------------------------------ */
+
+function EcranGenerationLibre({ token }) {
+  const [matieres, setMatieres] = useState([]);
+  const [matiereId, setMatiereId] = useState("");
+  const [niveau, setNiveau] = useState("");
+  const [theme, setTheme] = useState("");
+  const [genere, setGenere] = useState(null);
+  const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState(null);
+
+  useEffect(() => {
+    apiFetch("/enseignant/matieres", { token }).then((m) => { setMatieres(m); if (m[0]) setMatiereId(m[0].id); }).catch(() => {});
+  }, [token]);
+
+  async function generer(e) {
+    e.preventDefault();
+    setEnCours(true); setErreur(null); setGenere(null);
+    try {
+      const resultat = await apiFetch("/enseignant/generation-libre", {
+        method: "POST", token, body: { matiere_id: matiereId, niveau, theme },
+      });
+      setGenere(resultat);
+    } catch (e) { setErreur(e.message); }
+    finally { setEnCours(false); }
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
+      <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Génération libre</h1>
+      <p className="text-sm mb-8" style={{ color: C.encreDoux }}>
+        Génère un exercice sur le niveau et le thème de ton choix, sans dépendre d'une classe réelle — utile pour explorer un thème
+        ou préparer du contenu en tant qu'enseignant indépendant. Le résultat n'est ni sauvegardé ni relu par un collègue : à vérifier avant usage.
+      </p>
+
+      <BandeauErreur message={erreur} />
+
+      <form onSubmit={generer} className="rounded-2xl p-6 border space-y-3 mb-6" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+        <div className="grid grid-cols-2 gap-3">
+          <select value={matiereId} onChange={(e) => setMatiereId(e.target.value)} required
+            className="eduai-focus rounded-lg px-3 py-2.5 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}>
+            {matieres.map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
+          </select>
+          <input required value={niveau} onChange={(e) => setNiveau(e.target.value)} placeholder="Niveau (ex : Terminale D)"
+            className="eduai-focus rounded-lg px-3 py-2.5 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
+        </div>
+        <input required value={theme} onChange={(e) => setTheme(e.target.value)} placeholder="Thème (ex : les suites numériques)"
+          className="eduai-focus w-full rounded-lg px-3 py-2.5 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
+        <button type="submit" disabled={enCours}
+          className="eduai-focus flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
+          {enCours ? <Loader2 size={14} className="eduai-spin" /> : <Wand2 size={14} />} Générer
+        </button>
+      </form>
+
+      {genere && (
+        <div className="rounded-2xl p-6 border eduai-fade-in" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+          <div className="rounded-lg px-3 py-2 mb-4 text-xs flex items-start gap-2" style={{ backgroundColor: C.ambreFond, color: C.ambre }}>
+            <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" /> {genere.avertissement}
+          </div>
+          <h2 className="eduai-display text-lg mb-1" style={{ color: C.encre }}>{genere.theme}</h2>
+          {genere.sous_theme && <p className="text-xs mb-4" style={{ color: C.encreAttenue }}>{genere.sous_theme}</p>}
+          <p className="text-sm font-semibold mb-1" style={{ color: C.encre }}>Énoncé</p>
+          <p className="text-sm mb-4 whitespace-pre-wrap" style={{ color: C.encreDoux }}>{genere.enonce}</p>
+          <p className="text-sm font-semibold mb-1" style={{ color: C.encre }}>Corrigé</p>
+          <p className="text-sm mb-4 whitespace-pre-wrap" style={{ color: C.encreDoux }}>{genere.corrige}</p>
+          {genere.etapes?.length > 0 && (
+            <>
+              <p className="text-sm font-semibold mb-1" style={{ color: C.encre }}>Étapes</p>
+              <ul className="list-disc list-inside text-sm mb-4 space-y-0.5" style={{ color: C.encreDoux }}>
+                {genere.etapes.map((et, i) => <li key={i}>{et}</li>)}
+              </ul>
+            </>
+          )}
+          {genere.tags?.length > 0 && (
+            <div className="flex gap-1.5 flex-wrap">
+              {genere.tags.map((t) => (
+                <span key={t} className="rounded-full px-2 py-0.5 text-[11px]" style={{ backgroundColor: C.bleuFond, color: C.encre }}>{t}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Écran : Invitations reçues d'un établissement                      */
+/* ------------------------------------------------------------------ */
+
+function EcranInvitations({ token, onTraitee }) {
+  const [invitations, setInvitations] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+  const [enCours, setEnCours] = useState(null);
+
+  const charger = useCallback(() => {
+    setChargement(true); setErreur(null);
+    apiFetch("/enseignant/invitations", { token }).then(setInvitations).catch((e) => setErreur(e.message)).finally(() => setChargement(false));
+  }, [token]);
+
+  useEffect(() => { charger(); }, [charger]);
+
+  async function repondre(id, accepter) {
+    setEnCours(id); setErreur(null);
+    try {
+      await apiFetch(`/enseignant/invitations/${id}/${accepter ? "accepter" : "refuser"}`, { method: "POST", token });
+      charger();
+      onTraitee?.();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnCours(null); }
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
+      <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Invitations</h1>
+      <p className="text-sm mb-8" style={{ color: C.encreDoux }}>Établissements qui t'invitent à les rejoindre.</p>
+
+      <BandeauErreur message={erreur} />
+
+      {chargement ? <Chargement /> : (
+        <div className="space-y-3">
+          {invitations.map((inv) => (
+            <div key={inv.id} className="rounded-2xl p-5 border flex items-center justify-between" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: C.encre }}>{inv.etablissement_nom}</p>
+                <p className="text-xs" style={{ color: C.encreAttenue }}>t'invite à rejoindre son établissement</p>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => repondre(inv.id, true)} disabled={enCours === inv.id}
+                  className="eduai-focus rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
+                  Accepter
+                </button>
+                <button onClick={() => repondre(inv.id, false)} disabled={enCours === inv.id}
+                  className="eduai-focus rounded-lg px-3 py-1.5 text-xs font-medium border" style={{ borderColor: C.ligne, color: C.encreDoux }}>
+                  Refuser
+                </button>
+              </div>
+            </div>
+          ))}
+          {invitations.length === 0 && <p className="text-sm text-center py-10" style={{ color: C.encreAttenue }}>Aucune invitation en attente.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Application                                                        */
 /* ------------------------------------------------------------------ */
 
@@ -1534,6 +1727,8 @@ export default function App() {
   const [classeActive, setClasseActive] = useState(null);
   const [eleveActif, setEleveActif] = useState(null);
 
+  const [nombreInvitations, setNombreInvitations] = useState(0);
+
   async function connecter(email, motDePasse) {
     setConnexionEnCours(true); setErreurConnexion(null);
     try {
@@ -1543,9 +1738,18 @@ export default function App() {
     finally { setConnexionEnCours(false); }
   }
 
+  async function inscrire(payload) {
+    setConnexionEnCours(true); setErreurConnexion(null);
+    try {
+      const { access_token } = await apiFetch("/auth/inscription-enseignant", { method: "POST", body: payload });
+      setToken(access_token);
+    } catch (e) { setErreurConnexion(e.message); }
+    finally { setConnexionEnCours(false); }
+  }
+
   function deconnecter() {
     setToken(null); setVue("accueil");
-    setEnAttente([]); setCours([]); setClasses([]); setHistorique([]);
+    setEnAttente([]); setCours([]); setClasses([]); setHistorique([]); setNombreInvitations(0);
   }
 
   // Chargement initial une fois connecté : file de validation, cours, classes
@@ -1562,6 +1766,8 @@ export default function App() {
 
     apiFetch("/enseignant/mes-classes", { token })
       .then(setClasses).catch((e) => setErreurClasses(e.message)).finally(() => setChargementClasses(false));
+
+    apiFetch("/enseignant/invitations", { token }).then((inv) => setNombreInvitations(inv.length)).catch(() => {});
 
     setChargementInitial(false);
   }, [token]);
@@ -1590,15 +1796,17 @@ export default function App() {
       <style>{STYLES}</style>
 
       {!token ? (
-        <EcranConnexion onConnexion={connecter} connexionEnCours={connexionEnCours} erreurConnexion={erreurConnexion} />
+        <EcranConnexion onConnexion={connecter} onInscription={inscrire} connexionEnCours={connexionEnCours} erreurConnexion={erreurConnexion} />
       ) : (
         <>
-          <BarreNav vue={vue} setVue={setVue} onDeconnexion={deconnecter} nombreEnAttente={enAttente.length} />
+          <BarreNav vue={vue} setVue={setVue} onDeconnexion={deconnecter} nombreEnAttente={enAttente.length} nombreInvitations={nombreInvitations} />
           {vue === "accueil" && <EcranAccueil setVue={setVue} enAttente={enAttente} historique={historique} cours={cours} classes={classes} />}
 
           {vue === "mes-cours" && <EcranMesCours cours={cours} chargement={chargementCours} erreur={erreurCours} setVue={setVue} setCoursActifId={setCoursActifId} />}
           {vue === "deposer-cours" && <EcranDeposerCours classes={classes} token={token} setVue={setVue} onCoursDepose={onCoursDepose} />}
           {vue === "cours-detail" && coursActifId && <EcranCoursDetail coursId={coursActifId} token={token} setVue={setVue} />}
+          {vue === "generation-libre" && <EcranGenerationLibre token={token} />}
+          {vue === "invitations" && <EcranInvitations token={token} onTraitee={() => apiFetch("/enseignant/invitations", { token }).then((inv) => setNombreInvitations(inv.length)).catch(() => {})} />}
 
           {vue === "mes-classes" && <EcranMesClasses classes={classes} chargement={chargementClasses} erreur={erreurClasses} setVue={setVue} setClasseActive={setClasseActive} />}
           {vue === "mes-documents" && <EcranMesDocuments token={token} classes={classes} />}

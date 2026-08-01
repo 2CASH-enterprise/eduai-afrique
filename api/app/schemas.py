@@ -564,3 +564,50 @@ class ExerciceBiblioCommune(BaseModel):
     statut: str
     source: str
     created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Enseignant indépendant : auto-inscription, invitations, génération libre
+# ---------------------------------------------------------------------------
+
+class InscriptionEnseignant(BaseModel):
+    email: str
+    mot_de_passe: str
+    nom: str
+    prenom: str
+    specialite: str | None = None
+
+
+class InvitationEnvoyee(BaseModel):
+    id: str
+    enseignant_email: str
+    statut: str
+    created_at: datetime
+
+
+class InvitationRecue(BaseModel):
+    id: str
+    etablissement_nom: str
+    statut: str
+    created_at: datetime
+
+
+class DemandeGenerationLibre(BaseModel):
+    niveau: str
+    # Texte libre, PAS de niveau_id : contrairement à matieres (globale),
+    # niveaux est une table propre à chaque établissement (via cycles). Un
+    # enseignant indépendant n'a accès à aucun niveau_id valide — voir
+    # l'incident du 31/07 sur ce même sujet (Collège Vogt, TODO.md point 3).
+    matiere_id: str
+    theme: str
+
+
+class ExerciceGenereLibre(BaseModel):
+    theme: str
+    sous_theme: str | None
+    enonce: str
+    corrige: str
+    etapes: list[str]
+    contexte: str | None
+    tags: list[str]
+    avertissement: str = "Contenu généré par IA, non relu par un humain — à vérifier avant toute utilisation en classe."

@@ -7,7 +7,7 @@ la prochaine fois.
 
 ---
 
-## 1. Connexion indépendante pour un enseignant (sans établissement inscrit)
+## 1. Connexion indépendante pour un enseignant (sans établissement inscrit) — ✅ FAIT le 01/08
 
 **Besoin exprimé** : un enseignant dont l'établissement n'est pas encore
 inscrit sur la plateforme doit pouvoir quand même s'inscrire et utiliser la
@@ -16,20 +16,22 @@ sans être rattaché à aucune école. Plus tard, quand son établissement
 s'inscrit à son tour, celui-ci doit pouvoir **l'inviter à le rejoindre** —
 sans repartir de zéro.
 
-**Implications techniques identifiées (à valider avant de coder)** :
-- Le compte enseignant doit pouvoir exister avec `etablissement_id = NULL`
-  (actuellement, `get_enseignant_connecte` et les endpoints enseignant
-  supposent tous un établissement — à revérifier précisément).
-- Il faut un vrai **flux d'auto-inscription** pour les enseignants, qui
-  n'existe pas du tout aujourd'hui (tous les comptes sont créés par un
-  administratif ou en SQL direct).
-- Il faut un **flux d'invitation** : un établissement invite (par email) un
-  enseignant déjà existant sur la plateforme à le rejoindre, l'enseignant
-  accepte, son compte se rattache à l'école.
-- Se combine avec le point 2 ci-dessous : si un enseignant peut aussi
-  travailler dans plusieurs écoles à la fois, `etablissement_id` unique sur
-  `utilisateurs` ne suffit peut-être plus — voir la question d'architecture
-  commune aux deux points.
+**Construit et déployé** :
+- `POST /auth/inscription-enseignant` — auto-inscription, connexion
+  automatique, `etablissement_id = NULL`.
+- `POST /enseignant/generation-libre` — génération d'exercice à la demande
+  sur niveau (texte libre) + matière + thème choisis, sans classe ni
+  établissement requis. Contenu jamais persisté, toujours accompagné d'un
+  avertissement explicite (non relu par un humain).
+- Flux d'invitation complet : `POST /administration/invitations` (un
+  établissement invite un enseignant indépendant existant par email) +
+  `GET/POST /enseignant/invitations` (consulter, accepter, refuser).
+- Interfaces des deux côtés (bascule connexion/inscription côté Enseignant,
+  écran Invitations des deux côtés, écran Génération libre).
+
+**Limite assumée pour cette V1** : un enseignant déjà rattaché à un
+établissement ne peut pas être invité par un autre — le multi-établissement
+simultané reste le point 2 ci-dessous, pas encore traité.
 
 ---
 

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   GraduationCap, Lock, Mail, LogOut, Bell, Loader2, AlertTriangle,
   Users, Plus, UserX, ScrollText, Send, Wallet, Check, Copy, Upload, FileSpreadsheet, Download,
-  FileText, Trash2, BookMarked,
+  FileText, Trash2, BookMarked, UserPlus,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -165,6 +165,7 @@ function BarreNav({ vue, setVue, onDeconnexion }) {
     { id: "paiements", label: "Paiements" },
     { id: "etablissement", label: "Établissement" },
     { id: "documents", label: "Documents" },
+    { id: "invitations", label: "Invitations" },
   ];
   return (
     <div className="sticky top-0 z-10 px-4 sm:px-8 py-3.5 flex items-center justify-between border-b flex-wrap gap-y-2"
@@ -1376,6 +1377,79 @@ function EcranDocuments({ token, classes, matieres }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Écran : Invitations (enseignants indépendants)                     */
+/* ------------------------------------------------------------------ */
+
+function EcranInvitations({ token }) {
+  const [invitations, setInvitations] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+  const [email, setEmail] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+  const [succes, setSucces] = useState(null);
+
+  const charger = useCallback(() => {
+    setChargement(true); setErreur(null);
+    apiFetch("/administration/invitations", { token }).then(setInvitations).catch((e) => setErreur(e.message)).finally(() => setChargement(false));
+  }, [token]);
+
+  useEffect(() => { charger(); }, [charger]);
+
+  async function envoyer(e) {
+    e.preventDefault();
+    setEnvoi(true); setErreur(null); setSucces(null);
+    try {
+      await apiFetch("/administration/invitations", { method: "POST", token, body: { email } });
+      setSucces(`Invitation envoyée à ${email}.`);
+      setEmail("");
+      charger();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoi(false); }
+  }
+
+  const badgeStatut = (s) => {
+    if (s === "acceptee") return { label: "Acceptée", bg: C.vertFond, fg: C.vert };
+    if (s === "refusee") return { label: "Refusée", bg: C.rougeFond, fg: C.rouge };
+    return { label: "En attente", bg: C.bleuFond, fg: C.encre };
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
+      <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Invitations</h1>
+      <p className="text-sm mb-8" style={{ color: C.encreDoux }}>
+        Invitez un enseignant déjà inscrit sur la plateforme de façon indépendante (sans établissement) à rejoindre le vôtre.
+      </p>
+
+      <BandeauErreur message={erreur} />
+      <BandeauSucces message={succes} />
+
+      <form onSubmit={envoyer} className="rounded-2xl p-5 border flex gap-2 mb-6" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+        <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email.enseignant@exemple.com"
+          className="eduai-focus flex-1 rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
+        <button type="submit" disabled={envoi} className="eduai-focus flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
+          {envoi ? <Loader2 size={12} className="eduai-spin" /> : <UserPlus size={13} />} Inviter
+        </button>
+      </form>
+
+      {chargement ? <Chargement /> : (
+        <div className="space-y-2">
+          {invitations.map((inv) => {
+            const badge = badgeStatut(inv.statut);
+            return (
+              <div key={inv.id} className="flex items-center justify-between rounded-lg border px-3 py-2.5" style={{ borderColor: C.ligne }}>
+                <span className="text-sm" style={{ color: C.encre }}>{inv.enseignant_email}</span>
+                <span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: badge.bg, color: badge.fg }}>{badge.label}</span>
+              </div>
+            );
+          })}
+          {invitations.length === 0 && <p className="text-sm text-center py-6" style={{ color: C.encreAttenue }}>Aucune invitation envoyée pour l'instant.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Application                                                        */
 /* ------------------------------------------------------------------ */
 
@@ -1418,6 +1492,7 @@ export default function App() {
           {vue === "paiements" && <EcranPaiements token={token} />}
           {vue === "etablissement" && <EcranEtablissement token={token} classes={classes} matieres={matieres} />}
           {vue === "documents" && <EcranDocuments token={token} classes={classes} matieres={matieres} />}
+          {vue === "invitations" && <EcranInvitations token={token} />}
         </>
       )}
     </div>

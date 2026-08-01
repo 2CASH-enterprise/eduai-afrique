@@ -174,6 +174,22 @@ CREATE TABLE affectations_enseignants (
 CREATE INDEX idx_affectations_enseignant ON affectations_enseignants(enseignant_id);
 CREATE INDEX idx_affectations_classe ON affectations_enseignants(classe_id);
 
+-- Invitation d'un enseignant indépendant (etablissement_id NULL) à
+-- rejoindre un établissement. Portée V1 : un enseignant déjà rattaché à un
+-- autre établissement ne peut pas être invité (multi-établissement
+-- simultané = chantier séparé).
+CREATE TABLE invitations_enseignants (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    etablissement_id    UUID NOT NULL REFERENCES etablissements(id) ON DELETE CASCADE,
+    enseignant_id       UUID NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+    statut              TEXT NOT NULL DEFAULT 'en_attente'
+                        CHECK (statut IN ('en_attente', 'acceptee', 'refusee')),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    traitee_at          TIMESTAMPTZ
+);
+CREATE INDEX idx_invitations_enseignant ON invitations_enseignants(enseignant_id);
+CREATE INDEX idx_invitations_etablissement ON invitations_enseignants(etablissement_id);
+
 -- Lien parent ↔ élève (un parent peut avoir plusieurs enfants,
 -- un élève peut avoir plusieurs tuteurs légaux)
 CREATE TABLE parents_eleves (
