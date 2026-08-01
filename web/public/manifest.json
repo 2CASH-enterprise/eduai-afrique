@@ -1,0 +1,14 @@
+{
+  "name": "ÉduAI Afrique",
+  "short_name": "ÉduAI",
+  "description": "Plateforme pédagogique intelligente pour l'Afrique francophone",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF8F3",
+  "theme_color": "#22304A",
+  "lang": "fr",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

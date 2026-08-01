@@ -87,26 +87,29 @@ niveaux manquants (5ème, 4ème, 3ème...) puis leurs classes.
 
 ---
 
-## 4. Version hors-ligne de l'application (correction du 31/07 : ce n'est PAS "en ligne")
+## 4. Version hors-ligne — ✅ FAIT (V1) le 01/08, inactive en production tant qu'HTTPS n'est pas en place
 
-**Besoin exprimé, précisé** : pas une question de nom de domaine ou de
-HTTPS — le vrai besoin est une **version qui fonctionne sans connexion
-internet**, parce que les utilisateurs se trouvent parfois dans des zones
-sans accès réseau. Un vrai chantier de fond, pas un réglage rapide.
+**Périmètre retenu, discuté le 01/08** : V1 volontairement limitée à la
+**consultation** hors-ligne (ce qui a déjà été chargé pendant qu'il y avait
+du réseau reste consultable sans réseau), pour élève et enseignant à
+parts égales. Pas de synchronisation d'actions hors-ligne (répondre à un
+exercice sans réseau, etc.) — chantier plus complexe, délibérément reporté.
+Tout ce qui touche l'IA ou plusieurs personnes reste par nature impossible
+sans réseau (génération, validation).
 
-**Implications techniques à explorer (pas encore creusées)** :
-- Passage en PWA (progressive web app) avec service worker, pour permettre
-  le chargement de l'app elle-même sans réseau.
-- Stratégie de cache/stockage local (exercices déjà chargés, cours
-  consultés...) pour un usage minimal hors-ligne.
-- Question centrale à trancher : quelles actions doivent rester possibles
-  hors-ligne (consulter un exercice déjà chargé, répondre à un exercice ?)
-  et lesquelles nécessitent forcément une connexion (génération IA,
-  connexion initiale, synchronisation des notes) ?
-- Stratégie de synchronisation au retour de la connexion (ex : réponses
-  données hors-ligne, à synchroniser ensuite).
-- Discussion produit à avoir avant de coder quoi que ce soit : le périmètre
-  hors-ligne réaliste pour une V1 (probablement partiel, pas l'app entière).
+**Construit et déployé** : service worker (`web/public/sw.js`, stratégie
+réseau d'abord puis repli sur le cache pour toute requête `GET`, jamais
+pour les écritures), manifeste PWA (`web/public/manifest.json` + icônes),
+bandeau "Hors-ligne" affiché automatiquement (`ServiceWorkerRegistration.jsx`,
+basé sur les événements `online`/`offline` du navigateur).
+
+**⚠️ Limite technique importante, à ne pas oublier** : les service workers
+exigent HTTPS (sauf en localhost) — tant que l'application tourne en HTTP
+simple sur l'IP du VPS, **ce service worker ne s'activera jamais en
+production**, même si le code est bien déployé. Il faut un nom de domaine +
+certificat HTTPS devant l'application pour que le hors-ligne fonctionne
+réellement. Confirmé fonctionnel en local (`localhost`) pendant cette
+session — juste en attente d'HTTPS pour la production.
 
 ---
 
@@ -188,6 +191,21 @@ Une fois récupérés par l'utilisateur (le site du MINESEC bloque l'accès
 automatisé), à déposer via le module Admin Plateforme
 (`POST /plateforme/documents`). Pas un chantier technique — juste une
 tâche opérationnelle en attente du matériel source.
+
+---
+
+## 10. Nom de domaine + HTTPS — nouveau, identifié comme prérequis du point 4
+
+**Découvert le 01/08** en construisant le hors-ligne : les service workers
+(la brique technique du hors-ligne) exigent HTTPS pour s'activer, sauf en
+localhost. Tant que l'application tourne en HTTP simple sur l'IP du VPS
+(`http://89.116.111.3`), le hors-ligne construit au point 4 restera
+inactif en production, même si le code est bien déployé.
+
+**À faire** : acheter/configurer un nom de domaine, mettre en place un
+certificat HTTPS (ex : Let's Encrypt via Certbot) devant l'application —
+probablement avec un reverse proxy (nginx) devant l'API et le frontend,
+puisqu'ils tournent actuellement sur des ports distincts en HTTP direct.
 
 ---
 
