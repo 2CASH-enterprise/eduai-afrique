@@ -25,10 +25,11 @@ LABELS_RESSOURCE = {
 def _verifier_cours_du_enseignant(cur, cours_id: str, enseignant_id: str):
     cur.execute(
         """
-        SELECT c.id, c.titre, c.contenu_texte, c.created_at, m.nom, cl.nom
+        SELECT c.id, c.titre, c.contenu_texte, c.created_at, m.nom, COALESCE(cl.nom, cp.nom)
         FROM cours c
         JOIN matieres m ON m.id = c.matiere_id
-        JOIN classes cl ON cl.id = c.classe_id
+        LEFT JOIN classes cl ON cl.id = c.classe_id
+        LEFT JOIN classes_personnelles cp ON cp.id = c.classe_personnelle_id
         WHERE c.id = %s AND c.enseignant_id = %s
         """,
         (cours_id, enseignant_id),
@@ -45,40 +46,62 @@ def deposer_cours(
     payload: DepotCours,
     enseignant: EnseignantConnecte = Depends(get_enseignant_connecte),
 ):
+    if bool(payload.classe_id) == bool(payload.classe_personnelle_id):
+        raise HTTPException(status_code=422, detail="Précisez classe_id (établissement) OU classe_personnelle_id, pas les deux")
+
     with get_cursor(commit=True) as cur:
-        # Vérifie que l'enseignant est bien affecté à cette classe/matière
-        cur.execute(
-            "SELECT 1 FROM affectations_enseignants WHERE enseignant_id = %s AND classe_id = %s AND matiere_id = %s",
-            (enseignant.id, payload.classe_id, payload.matiere_id),
-        )
-        if cur.fetchone() is None:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                                 detail="Vous n'êtes pas affecté à cette classe pour cette matière")
+        if payload.classe_id:
+            # Vraie classe d'établissement — vérifie l'affectation.
+            cur.execute(
+                "SELECT 1 FROM affectations_enseignants WHERE enseignant_id = %s AND classe_id = %s AND matiere_id = %s",
+                (enseignant.id, payload.classe_id, payload.matiere_id),
+            )
+            if cur.fetchone() is None:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                     detail="Vous n'êtes pas affecté à cette classe pour cette matière")
+        else:
+            # Classe personnelle — vérifie qu'elle appartient bien à l'enseignant.
+            cur.execute(
+                "SELECT 1 FROM classes_personnelles WHERE id = %s AND enseignant_id = %s",
+                (payload.classe_personnelle_id, enseignant.id),
+            )
+            if cur.fetchone() is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Classe personnelle introuvable")
 
         cur.execute(
             """
-            INSERT INTO cours (enseignant_id, classe_id, matiere_id, titre, contenu_texte, fichier_url, date_seance)
-            VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id, titre, contenu_texte, created_at
+            INSERT INTO cours (enseignant_id, classe_id, classe_personnelle_id, matiere_id, titre, contenu_texte, fichier_url, date_seance)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id, titre, contenu_texte, created_at
             """,
-            (enseignant.id, payload.classe_id, payload.matiere_id, payload.titre,
-             payload.contenu_texte, payload.fichier_url, payload.date_seance),
+            (enseignant.id, payload.classe_id, payload.classe_personnelle_id, payload.matiere_id,
+             payload.titre, payload.contenu_texte, payload.fichier_url, payload.date_seance),
         )
         cours_id, titre, contenu_texte, created_at = cur.fetchone()
 
         cur.execute("SELECT nom FROM matieres WHERE id = %s", (payload.matiere_id,))
         matiere_nom = cur.fetchone()[0]
-        cur.execute(
-            "SELECT c.niveau_id, n.nom, c.etablissement_id FROM classes c "
-            "JOIN niveaux n ON n.id = c.niveau_id WHERE c.id = %s",
-            (payload.classe_id,),
-        )
-        niveau_id, niveau_nom, etablissement_id = cur.fetchone()
+
+        if payload.classe_id:
+            cur.execute(
+                "SELECT c.nom, c.niveau_id, n.nom, c.etablissement_id FROM classes c "
+                "JOIN niveaux n ON n.id = c.niveau_id WHERE c.id = %s",
+                (payload.classe_id,),
+            )
+            classe_nom, niveau_id, niveau_nom, etablissement_id = cur.fetchone()
+            niveau_id, etablissement_id = str(niveau_id), str(etablissement_id)
+        else:
+            # Pas de niveau_id (texte libre, aucune table de niveaux
+            # globale) ni d'établissement — le RAG se limite alors au
+            # contenu partagé plateforme entière, filtré par matière.
+            cur.execute("SELECT nom, niveau FROM classes_personnelles WHERE id = %s", (payload.classe_personnelle_id,))
+            classe_nom, niveau_nom = cur.fetchone()
+            niveau_id, etablissement_id = None, None
 
         ressources = []
         for type_ressource in TYPES_RESSOURCE:
             contenu = generation_cours.generer_ressource(
                 type_ressource, titre, contenu_texte, matiere_nom, niveau_nom,
-                str(niveau_id), payload.matiere_id, str(etablissement_id), enseignant.id,
+                niveau_id, payload.matiere_id, etablissement_id, enseignant.id,
             )
             cur.execute(
                 """
@@ -91,9 +114,6 @@ def deposer_cours(
             ressources.append({"id": str(r_id), "type_ressource": r_type, "label": LABELS_RESSOURCE[r_type],
                                 "contenu": r_contenu, "statut": r_statut})
 
-        cur.execute("SELECT nom FROM classes WHERE id = %s", (payload.classe_id,))
-        classe_nom = cur.fetchone()[0]
-
     return CoursDetail(id=str(cours_id), titre=titre, matiere=matiere_nom, classe=classe_nom,
                         contenu_texte=contenu_texte, created_at=created_at, ressources=ressources)
 
@@ -103,15 +123,16 @@ def lister_mes_cours(enseignant: EnseignantConnecte = Depends(get_enseignant_con
     with get_cursor() as cur:
         cur.execute(
             """
-            SELECT c.id, c.titre, m.nom, cl.nom, c.created_at,
+            SELECT c.id, c.titre, m.nom, COALESCE(cl.nom, cp.nom), c.created_at,
                    COUNT(*) FILTER (WHERE r.statut = 'valide') AS validees,
                    COUNT(*) AS total
             FROM cours c
             JOIN matieres m ON m.id = c.matiere_id
-            JOIN classes cl ON cl.id = c.classe_id
+            LEFT JOIN classes cl ON cl.id = c.classe_id
+            LEFT JOIN classes_personnelles cp ON cp.id = c.classe_personnelle_id
             LEFT JOIN ressources_generees r ON r.cours_id = c.id
             WHERE c.enseignant_id = %s
-            GROUP BY c.id, c.titre, m.nom, cl.nom, c.created_at
+            GROUP BY c.id, c.titre, m.nom, cl.nom, cp.nom, c.created_at
             ORDER BY c.created_at DESC
             """,
             (enseignant.id,),
@@ -185,7 +206,7 @@ def modifier_ressource(
                 SELECT c.matiere_id, cl.niveau_id, c.titre, r.type_ressource, r.contenu
                 FROM ressources_generees r
                 JOIN cours c ON c.id = r.cours_id
-                JOIN classes cl ON cl.id = c.classe_id
+                LEFT JOIN classes cl ON cl.id = c.classe_id
                 WHERE r.id = %s
                 """,
                 (ressource_id,),

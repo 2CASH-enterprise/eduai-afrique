@@ -305,7 +305,11 @@ class DevoirParent(BaseModel):
 
 class DepotCours(BaseModel):
     titre: str
-    classe_id: str
+    classe_id: str | None = None
+    classe_personnelle_id: str | None = None
+    # Exactement l'un des deux — vraie classe d'établissement, ou classe
+    # personnelle déclarée par un enseignant indépendant (voir TODO.md
+    # point 1, ajusté le 01/08 suite à la discussion sur les crédits).
     matiere_id: str
     contenu_texte: str | None = None
     fichier_url: str | None = None

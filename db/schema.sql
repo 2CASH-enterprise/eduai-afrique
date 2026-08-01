@@ -277,17 +277,35 @@ CREATE INDEX idx_tentatives_exercice ON tentatives_exercices(exercice_id);
 -- 4. COURS & RESSOURCES GÉNÉRÉES (Module 4 — Enseignant)
 -- ============================================================================
 
+-- Classes personnelles : contexte que l'enseignant indépendant déclare
+-- lui-même (pas d'élèves réels, pas de bulletins) pour pouvoir utiliser le
+-- vrai flux "Déposer un cours" sans dépendre d'un établissement. Niveau en
+-- texte libre — aucune table de niveaux globale n'existe (niveaux est
+-- propre à chaque établissement, voir cycles).
+CREATE TABLE classes_personnelles (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    enseignant_id       UUID NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+    nom                 TEXT NOT NULL,
+    matiere_id          UUID NOT NULL REFERENCES matieres(id),
+    niveau              TEXT NOT NULL,
+    effectif            INTEGER,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_classes_personnelles_enseignant ON classes_personnelles(enseignant_id);
+
 CREATE TABLE cours (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     enseignant_id       UUID NOT NULL REFERENCES enseignants(utilisateur_id) ON DELETE CASCADE,
-    classe_id           UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    classe_id           UUID REFERENCES classes(id) ON DELETE CASCADE,
+    classe_personnelle_id UUID REFERENCES classes_personnelles(id) ON DELETE CASCADE,
     matiere_id          UUID NOT NULL REFERENCES matieres(id),
     titre               TEXT NOT NULL,
     contenu_texte       TEXT,
     fichier_url         TEXT,                          -- PDF / Word / PPT déposé
     date_seance         DATE,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT cours_une_seule_classe CHECK ((classe_id IS NULL) != (classe_personnelle_id IS NULL))
 );
 CREATE INDEX idx_cours_enseignant ON cours(enseignant_id);
 CREATE INDEX idx_cours_classe ON cours(classe_id);

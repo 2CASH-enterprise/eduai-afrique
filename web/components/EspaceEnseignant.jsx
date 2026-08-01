@@ -400,7 +400,7 @@ function EcranAccueil({ setVue, enAttente, historique, cours, classes }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
         <button
-          onClick={() => setVue(classes.length === 0 ? "generation-libre" : "deposer-cours")}
+          onClick={() => setVue("deposer-cours")}
           className="eduai-focus text-left rounded-xl p-6 transition-transform hover:-translate-y-0.5"
           style={{ backgroundColor: C.encre, boxShadow: C.surfaceOmbre }}
         >
@@ -477,7 +477,109 @@ function CarteStat({ label, valeur, icon: Icon, accent }) {
 /*  Écran : Mes classes (liste — /enseignant/mes-classes)              */
 /* ------------------------------------------------------------------ */
 
-function EcranMesClasses({ classes, chargement, erreur, setVue, setClasseActive }) {
+function SectionClassesPersonnelles({ token }) {
+  const [classesPerso, setClassesPerso] = useState([]);
+  const [matieres, setMatieres] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+  const [ouvert, setOuvert] = useState(false);
+  const [nom, setNom] = useState("");
+  const [matiereId, setMatiereId] = useState("");
+  const [niveau, setNiveau] = useState("");
+  const [effectif, setEffectif] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+
+  const charger = useCallback(() => {
+    setChargement(true); setErreur(null);
+    apiFetch("/enseignant/classes-personnelles", { token }).then(setClassesPerso).catch((e) => setErreur(e.message)).finally(() => setChargement(false));
+  }, [token]);
+
+  useEffect(() => { charger(); }, [charger]);
+  useEffect(() => {
+    apiFetch("/enseignant/matieres", { token }).then((m) => { setMatieres(m); if (m[0]) setMatiereId(m[0].id); }).catch(() => {});
+  }, [token]);
+
+  async function creer(e) {
+    e.preventDefault();
+    setEnvoi(true); setErreur(null);
+    try {
+      await apiFetch("/enseignant/classes-personnelles", {
+        method: "POST", token,
+        body: { nom, matiere_id: matiereId, niveau, effectif: effectif ? Number(effectif) : null },
+      });
+      setNom(""); setNiveau(""); setEffectif(""); setOuvert(false);
+      charger();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoi(false); }
+  }
+
+  async function supprimer(id) {
+    try {
+      await apiFetch(`/enseignant/classes-personnelles/${id}`, { method: "DELETE", token });
+      setClassesPerso((prev) => prev.filter((c) => c.id !== id));
+    } catch (e) { setErreur(e.message); }
+  }
+
+  return (
+    <div className="mt-10">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h2 className="eduai-display text-xl" style={{ color: C.encre }}>Mes classes personnelles</h2>
+          <p className="text-xs" style={{ color: C.encreAttenue }}>Déclarées par vous-même — pas d'élèves réels, juste un contexte pour générer vos cours.</p>
+        </div>
+      </div>
+
+      <BandeauErreur message={erreur} />
+
+      {ouvert ? (
+        <form onSubmit={creer} className="rounded-lg p-4 border space-y-2.5 mb-4" style={{ borderColor: C.ligne, backgroundColor: C.fond }}>
+          <input required value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom (ex : Soutien Terminale D)"
+            className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }} />
+          <div className="grid grid-cols-3 gap-2">
+            <select value={matiereId} onChange={(e) => setMatiereId(e.target.value)} required
+              className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }}>
+              {matieres.map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
+            </select>
+            <input required value={niveau} onChange={(e) => setNiveau(e.target.value)} placeholder="Niveau (ex : Terminale D)"
+              className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }} />
+            <input type="number" value={effectif} onChange={(e) => setEffectif(e.target.value)} placeholder="Effectif (optionnel)"
+              className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }} />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button type="submit" disabled={envoi} className="eduai-focus rounded-lg px-3.5 py-2 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
+              {envoi ? <Loader2 size={12} className="eduai-spin" /> : "Créer"}
+            </button>
+            <button type="button" onClick={() => setOuvert(false)} className="eduai-focus text-xs font-medium" style={{ color: C.encreDoux }}>Annuler</button>
+          </div>
+        </form>
+      ) : (
+        <button onClick={() => setOuvert(true)} className="eduai-focus flex items-center gap-1.5 text-xs font-medium mb-4" style={{ color: C.accentFonce }}>
+          <Plus size={13} /> Déclarer une classe personnelle
+        </button>
+      )}
+
+      {chargement ? <Chargement /> : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {classesPerso.map((cl) => (
+            <div key={cl.id} className="rounded-xl p-4 border flex items-start justify-between" style={{ backgroundColor: C.surface, borderColor: C.ligne }}>
+              <div>
+                <p className="text-xs font-medium mb-1" style={{ color: C.encreDoux }}>{cl.matiere} · {cl.niveau}</p>
+                <p className="text-sm font-semibold" style={{ color: C.encre }}>{cl.nom}</p>
+                {cl.effectif != null && <p className="text-[11px] mt-1" style={{ color: C.encreAttenue }}>{cl.effectif} élève{cl.effectif > 1 ? "s" : ""}</p>}
+              </div>
+              <button onClick={() => supprimer(cl.id)} className="eduai-focus" aria-label="Supprimer" style={{ color: C.encreAttenue }}>
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+          {classesPerso.length === 0 && <p className="text-sm" style={{ color: C.encreDoux }}>Aucune classe personnelle déclarée pour l'instant.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EcranMesClasses({ classes, chargement, erreur, setVue, setClasseActive, token }) {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
       <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Mes classes</h1>
@@ -513,6 +615,8 @@ function EcranMesClasses({ classes, chargement, erreur, setVue, setClasseActive 
           {classes.length === 0 && <p className="text-sm" style={{ color: C.encreDoux }}>Aucune classe affectée pour l'instant.</p>}
         </div>
       )}
+
+      {token && <SectionClassesPersonnelles token={token} />}
     </div>
   );
 }
@@ -818,7 +922,7 @@ function EcranMesCours({ cours, chargement, erreur, setVue, setCoursActifId, cla
           <h1 className="eduai-display text-3xl mb-1" style={{ color: C.encre }}>Mes cours</h1>
           <p className="text-sm" style={{ color: C.encreDoux }}>{cours.length} cours déposés dans ta banque personnelle.</p>
         </div>
-        <button onClick={() => setVue(classes.length === 0 ? "generation-libre" : "deposer-cours")} className="eduai-focus flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold" style={{ backgroundColor: C.encre, color: C.surface }}>
+        <button onClick={() => setVue("deposer-cours")} className="eduai-focus flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold" style={{ backgroundColor: C.encre, color: C.surface }}>
           <Plus size={15} /> Déposer un cours
         </button>
       </div>
@@ -858,9 +962,21 @@ function EcranMesCours({ cours, chargement, erreur, setVue, setCoursActifId, cla
 /* ------------------------------------------------------------------ */
 
 function EcranDeposerCours({ classes, token, setVue, onCoursDepose }) {
-  const [affectationChoisie, setAffectationChoisie] = useState(
-    classes[0] ? `${classes[0].classe_id}:${classes[0].matiere_id}` : ""
-  );
+  const [classesPerso, setClassesPerso] = useState([]);
+  const [chargementPerso, setChargementPerso] = useState(true);
+
+  useEffect(() => {
+    apiFetch("/enseignant/classes-personnelles", { token }).then(setClassesPerso).catch(() => {}).finally(() => setChargementPerso(false));
+  }, [token]);
+
+  const options = [
+    ...classes.map((cl) => ({ valeur: `etab:${cl.classe_id}:${cl.matiere_id}`, label: `${cl.nom} — ${cl.matiere} (${cl.etablissement_nom})` })),
+    ...classesPerso.map((cl) => ({ valeur: `perso:${cl.id}:${cl.matiere_id}`, label: `${cl.nom} — ${cl.matiere} (personnelle)` })),
+  ];
+
+  const [choix, setChoix] = useState("");
+  useEffect(() => { if (!choix && options.length) setChoix(options[0].valeur); }, [options.length]);
+
   const [titre, setTitre] = useState("");
   const [contenu, setContenu] = useState("");
   const [envoi, setEnvoi] = useState(false);
@@ -868,23 +984,30 @@ function EcranDeposerCours({ classes, token, setVue, onCoursDepose }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const [classe_id, matiere_id] = affectationChoisie.split(":");
+    const [type, id, matiere_id] = choix.split(":");
     setEnvoi(true); setErreur(null);
     try {
-      const cours = await apiFetch("/enseignant/cours", {
-        method: "POST", token,
-        body: { titre, classe_id, matiere_id, contenu_texte: contenu || null },
-      });
+      const body = { titre, matiere_id, contenu_texte: contenu || null };
+      if (type === "etab") body.classe_id = id; else body.classe_personnelle_id = id;
+      const cours = await apiFetch("/enseignant/cours", { method: "POST", token, body });
       onCoursDepose(cours);
       setVue("cours-detail");
     } catch (e) { setErreur(e.message); }
     finally { setEnvoi(false); }
   }
 
-  if (classes.length === 0) {
+  if (chargementPerso) return <Chargement />;
+
+  if (options.length === 0) {
     return (
       <div className="max-w-2xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
-        <BandeauErreur message="Aucune affectation trouvée — vous devez être affecté à au moins une classe/matière pour déposer un cours." />
+        <BandeauErreur message="Aucune classe disponible pour l'instant." />
+        <p className="text-sm mb-4" style={{ color: C.encreDoux }}>
+          Vous n'êtes affecté à aucune classe d'établissement, et vous n'avez pas encore déclaré de classe personnelle.
+        </p>
+        <button onClick={() => setVue("mes-classes")} className="eduai-focus rounded-lg px-4 py-2.5 text-sm font-semibold" style={{ backgroundColor: C.encre, color: C.surface }}>
+          Déclarer une classe personnelle
+        </button>
       </div>
     );
   }
@@ -912,14 +1035,10 @@ function EcranDeposerCours({ classes, token, setVue, onCoursDepose }) {
 
         <label className="block">
           <span className="text-xs font-medium mb-1.5 block" style={{ color: C.encreDoux }}>Classe / matière</span>
-          <select value={affectationChoisie} onChange={(e) => setAffectationChoisie(e.target.value)}
+          <select value={choix} onChange={(e) => setChoix(e.target.value)}
             className="eduai-focus w-full rounded-lg px-3.5 py-2.5 text-sm outline-none border"
             style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}>
-            {classes.map((cl) => (
-              <option key={`${cl.classe_id}:${cl.matiere_id}`} value={`${cl.classe_id}:${cl.matiere_id}`}>
-                {cl.nom} — {cl.matiere}
-              </option>
-            ))}
+            {options.map((o) => <option key={o.valeur} value={o.valeur}>{o.label}</option>)}
           </select>
           <span className="text-[11px] mt-1 block" style={{ color: C.encreAttenue }}>
             Limité à vos affectations réelles.
@@ -1824,7 +1943,7 @@ export default function App() {
           {vue === "generation-libre" && <EcranGenerationLibre token={token} />}
           {vue === "invitations" && <EcranInvitations token={token} onTraitee={() => apiFetch("/enseignant/invitations", { token }).then((inv) => setNombreInvitations(inv.length)).catch(() => {})} />}
 
-          {vue === "mes-classes" && <EcranMesClasses classes={classes} chargement={chargementClasses} erreur={erreurClasses} setVue={setVue} setClasseActive={setClasseActive} />}
+          {vue === "mes-classes" && <EcranMesClasses classes={classes} chargement={chargementClasses} erreur={erreurClasses} setVue={setVue} setClasseActive={setClasseActive} token={token} />}
           {vue === "mes-documents" && <EcranMesDocuments token={token} classes={classes} />}
           {vue === "classe-detail" && classeActive && <EcranClasseDetail classeActive={classeActive} token={token} setVue={setVue} setEleveActif={setEleveActif} />}
           {vue === "eleve-detail" && eleveActif && classeActive && <EcranEleveDetail eleveActif={eleveActif} classeActive={classeActive} token={token} setVue={setVue} />}
