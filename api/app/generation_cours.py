@@ -72,7 +72,10 @@ SCHEMAS_PAR_TYPE = {
 }
 
 # Clés minimales à retrouver pour considérer que l'IA a bien respecté le
-# schéma — sert de filet de validation avant d'accepter la structure.
+# schéma — conservé pour référence/documentation, la validation réelle est
+# désormais dans _structure_valide (plus stricte : vérifie aussi la FORME
+# des valeurs, pas juste leur présence — voir incident du 03/08 où
+# "exercices" existait mais n'était pas une vraie liste d'objets).
 CLES_REQUISES_PAR_TYPE = {
     "fiche_pedagogique": ["objectifs", "deroulement"],
     "resume": ["definitions_cles", "regles_principales"],
@@ -81,6 +84,35 @@ CLES_REQUISES_PAR_TYPE = {
     "devoir": ["exercices", "probleme"],
     "controle": ["exercices", "exercice_synthese"],
 }
+
+
+def _est_liste_non_vide_de_dicts(valeur) -> bool:
+    return isinstance(valeur, list) and len(valeur) > 0 and all(isinstance(item, dict) for item in valeur)
+
+
+def _structure_valide(type_ressource: str, donnees) -> bool:
+    """Vérifie la FORME réelle attendue, pas seulement la présence des
+    clés — une IA peut renvoyer "exercices": {...} (un objet) au lieu de
+    "exercices": [...] (une liste), ce qui passerait un simple contrôle de
+    présence mais casserait l'affichage dédié (incident du 03/08)."""
+    if not isinstance(donnees, dict):
+        return False
+    if type_ressource == "fiche_pedagogique":
+        return (isinstance(donnees.get("objectifs"), list) and len(donnees["objectifs"]) > 0
+                and _est_liste_non_vide_de_dicts(donnees.get("deroulement")))
+    if type_ressource == "resume":
+        return (_est_liste_non_vide_de_dicts(donnees.get("definitions_cles"))
+                and isinstance(donnees.get("regles_principales"), list) and len(donnees["regles_principales"]) > 0)
+    if type_ressource == "exercices":
+        return _est_liste_non_vide_de_dicts(donnees.get("exercices"))
+    if type_ressource == "qcm":
+        return _est_liste_non_vide_de_dicts(donnees.get("questions"))
+    if type_ressource == "devoir":
+        return bool(_est_liste_non_vide_de_dicts(donnees.get("exercices")) and isinstance(donnees.get("probleme"), dict) and donnees["probleme"])
+    if type_ressource == "controle":
+        return bool(_est_liste_non_vide_de_dicts(donnees.get("exercices"))
+                and isinstance(donnees.get("exercice_synthese"), dict) and donnees["exercice_synthese"])
+    return False
 
 
 def _aplatir_en_texte(valeur, niveau: int = 0) -> str:
@@ -105,11 +137,6 @@ def _aplatir_en_texte(valeur, niveau: int = 0) -> str:
         return "\n".join(lignes)
     return str(valeur)
 
-
-def _structure_valide(type_ressource: str, donnees: dict) -> bool:
-    if not isinstance(donnees, dict):
-        return False
-    return all(cle in donnees and donnees[cle] not in (None, [], {}) for cle in CLES_REQUISES_PAR_TYPE[type_ressource])
 
 
 def _rechercher_contexte(matiere_nom: str, niveau_nom: str, titre_cours: str,

@@ -1283,6 +1283,25 @@ function RenduRessource({ type, contenu }) {
   if (contenu.texte !== undefined && Object.keys(contenu).length === 1) {
     return <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: C.encreDoux }}>{contenu.texte}</p>;
   }
+
+  // Filet de sécurité supplémentaire côté frontend : même si le backend a
+  // validé la structure, on vérifie que le rendu dédié aurait bien
+  // quelque chose à montrer avant de s'y engager — sinon on affiche le
+  // contenu aplati plutôt qu'une carte vide (incident du 03/08).
+  const estListeNonVide = (v) => Array.isArray(v) && v.length > 0;
+  const structureAffichable = {
+    fiche_pedagogique: estListeNonVide(contenu.objectifs) && estListeNonVide(contenu.deroulement),
+    resume: estListeNonVide(contenu.definitions_cles) && estListeNonVide(contenu.regles_principales),
+    exercices: estListeNonVide(contenu.exercices),
+    qcm: estListeNonVide(contenu.questions),
+    devoir: estListeNonVide(contenu.exercices) && !!contenu.probleme,
+    controle: estListeNonVide(contenu.exercices) && !!contenu.exercice_synthese,
+  }[type];
+
+  if (!structureAffichable) {
+    return <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: C.encreDoux }}>{aplatirPourEdition(contenu)}</p>;
+  }
+
   switch (type) {
     case "fiche_pedagogique": return <RenduFichePedagogique contenu={contenu} />;
     case "resume": return <RenduResume contenu={contenu} />;
