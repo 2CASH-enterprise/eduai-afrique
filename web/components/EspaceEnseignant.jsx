@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  GraduationCap, Lock, Mail, ChevronLeft, ChevronRight,
+  GraduationCap, Lock, Mail, ChevronLeft, ChevronRight, ChevronDown,
   Check, X as XIcon, Pencil, Bot, CalculatorIcon, LogOut, Bell,
   Calculator, FlaskConical, Leaf, Landmark, Languages, Clock, History,
   FileText, Wand2, Sparkles, Trash2, Plus, BookMarked,
@@ -1089,6 +1089,211 @@ function EcranDeposerCours({ classes, token, setVue, onCoursDepose }) {
 /*  Écran : Détail d'un cours + ressources (GET/PATCH réels)           */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/*  Rendu structuré des ressources — une présentation par type,        */
+/*  plutôt qu'un simple bloc de texte (voir generation_cours.py)       */
+/* ------------------------------------------------------------------ */
+
+// Convertit n'importe quelle structure en texte lisible — utilisé
+// uniquement pour préremplir la zone d'édition (miroir de la fonction
+// Python _aplatir_en_texte). Une fois modifié et enregistré, le contenu
+// redevient un simple texte (perd la mise en forme dédiée), ce qui reste
+// un compromis raisonnable pour ne pas construire un éditeur par type.
+function aplatirPourEdition(valeur, niveau = 0) {
+  const prefixe = "  ".repeat(niveau);
+  if (typeof valeur === "string") return valeur;
+  if (valeur === null || valeur === undefined) return "";
+  if (typeof valeur === "number" || typeof valeur === "boolean") return String(valeur);
+  if (Array.isArray(valeur)) return valeur.map((v) => `${prefixe}- ${aplatirPourEdition(v, niveau + 1)}`).join("\n");
+  if (typeof valeur === "object") {
+    return Object.entries(valeur).map(([cle, sousValeur]) => {
+      const libelle = cle.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+      const sousTexte = aplatirPourEdition(sousValeur, niveau + 1);
+      return sousTexte.includes("\n") ? `${prefixe}${libelle} :\n${sousTexte}` : `${prefixe}${libelle} : ${sousTexte}`;
+    }).join("\n");
+  }
+  return String(valeur);
+}
+
+function BlocExercice({ numero, difficulte, points, enonce, corrige }) {
+  const [ouvert, setOuvert] = useState(false);
+  return (
+    <div className="rounded-lg border px-3.5 py-3" style={{ borderColor: C.ligne }}>
+      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+        <span className="eduai-mono text-xs font-semibold" style={{ color: C.accentFonce }}>Exercice {numero}</span>
+        {difficulte && (
+          <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={badgeColorForDifficulte(difficulte)}>{difficulte}</span>
+        )}
+        {points != null && (
+          <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: C.bleuFond, color: C.encre }}>{points} pts</span>
+        )}
+      </div>
+      <p className="text-sm mb-2 whitespace-pre-wrap" style={{ color: C.encre }}>{enonce}</p>
+      <button onClick={() => setOuvert((o) => !o)} className="eduai-focus flex items-center gap-1 text-xs font-medium" style={{ color: C.accentFonce }}>
+        <ChevronDown size={12} style={{ transform: ouvert ? "rotate(180deg)" : "none", transition: "transform 150ms" }} />
+        {ouvert ? "Masquer le corrigé" : "Voir le corrigé"}
+      </button>
+      {ouvert && <p className="text-sm mt-2 pt-2 border-t whitespace-pre-wrap" style={{ borderColor: C.ligne, color: C.encreDoux }}>{corrige}</p>}
+    </div>
+  );
+}
+
+function RenduFichePedagogique({ contenu }) {
+  return (
+    <div className="space-y-4">
+      {contenu.objectifs?.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold mb-1.5" style={{ color: C.encre }}>Objectifs</p>
+          <ul className="list-disc list-inside text-sm space-y-0.5" style={{ color: C.encreDoux }}>
+            {contenu.objectifs.map((o, i) => <li key={i}>{o}</li>)}
+          </ul>
+        </div>
+      )}
+      {contenu.competences_visees?.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold mb-1.5" style={{ color: C.encre }}>Compétences visées</p>
+          <ul className="list-disc list-inside text-sm space-y-0.5" style={{ color: C.encreDoux }}>
+            {contenu.competences_visees.map((c, i) => <li key={i}>{c}</li>)}
+          </ul>
+        </div>
+      )}
+      {contenu.deroulement?.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold mb-1.5" style={{ color: C.encre }}>Déroulement</p>
+          <div className="space-y-2">
+            {contenu.deroulement.map((etape, i) => (
+              <div key={i} className="rounded-lg border px-3 py-2" style={{ borderColor: C.ligne }}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-semibold" style={{ color: C.encre }}>{etape.etape}</span>
+                  {etape.duree && (
+                    <span className="flex items-center gap-1 text-[10px] rounded-full px-2 py-0.5" style={{ backgroundColor: C.bleuFond, color: C.encre }}>
+                      <Clock size={9} /> {etape.duree}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm" style={{ color: C.encreDoux }}>{etape.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RenduResume({ contenu }) {
+  return (
+    <div className="space-y-4">
+      {contenu.definitions_cles?.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold mb-1.5" style={{ color: C.encre }}>Définitions clés</p>
+          <div className="space-y-1.5">
+            {contenu.definitions_cles.map((d, i) => (
+              <p key={i} className="text-sm" style={{ color: C.encreDoux }}>
+                <span className="font-semibold" style={{ color: C.encre }}>{d.terme}</span> — {d.definition}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+      {contenu.regles_principales?.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold mb-1.5" style={{ color: C.encre }}>Règles principales</p>
+          <ul className="list-disc list-inside text-sm space-y-0.5" style={{ color: C.encreDoux }}>
+            {contenu.regles_principales.map((r, i) => <li key={i}>{r}</li>)}
+          </ul>
+        </div>
+      )}
+      {contenu.exemple_travaille && (
+        <div className="rounded-lg px-3 py-2.5" style={{ backgroundColor: C.fond }}>
+          <p className="text-xs font-semibold mb-1" style={{ color: C.encre }}>Exemple travaillé</p>
+          <p className="text-sm mb-1.5 whitespace-pre-wrap" style={{ color: C.encre }}>{contenu.exemple_travaille.enonce}</p>
+          <p className="text-sm whitespace-pre-wrap" style={{ color: C.encreDoux }}>{contenu.exemple_travaille.resolution}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RenduExercices({ contenu }) {
+  return (
+    <div className="space-y-2.5">
+      {(contenu.exercices || []).map((ex, i) => (
+        <BlocExercice key={i} numero={ex.numero ?? i + 1} difficulte={ex.difficulte} points={ex.points} enonce={ex.enonce} corrige={ex.corrige} />
+      ))}
+    </div>
+  );
+}
+
+function RenduQcm({ contenu }) {
+  return (
+    <div className="space-y-3">
+      {(contenu.questions || []).map((q, i) => (
+        <div key={i} className="rounded-lg border px-3.5 py-3" style={{ borderColor: C.ligne }}>
+          <p className="text-sm font-medium mb-2" style={{ color: C.encre }}>{q.numero ?? i + 1}. {q.question}</p>
+          <div className="space-y-1">
+            {(q.choix || []).map((choix, j) => {
+              const estBonne = j === q.bonne_reponse;
+              return (
+                <div key={j} className="flex items-center gap-2 text-sm rounded-md px-2 py-1"
+                  style={estBonne ? { backgroundColor: C.vertFond, color: C.vert } : { color: C.encreDoux }}>
+                  {estBonne ? <Check size={13} /> : <span className="w-[13px] text-center eduai-mono text-[10px]">{String.fromCharCode(65 + j)}</span>}
+                  <span>{choix}</span>
+                </div>
+              );
+            })}
+          </div>
+          {q.explication && <p className="text-xs mt-2 italic" style={{ color: C.encreAttenue }}>{q.explication}</p>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RenduDevoirOuControle({ contenu, cleFinale, labelFinal }) {
+  const blocFinal = contenu[cleFinale];
+  return (
+    <div className="space-y-2.5">
+      {contenu.duree && (
+        <p className="flex items-center gap-1 text-xs" style={{ color: C.encreAttenue }}><Clock size={11} /> {contenu.duree}</p>
+      )}
+      {(contenu.exercices || []).map((ex, i) => (
+        <BlocExercice key={i} numero={ex.numero ?? i + 1} points={ex.points} enonce={ex.enonce} corrige={ex.corrige} />
+      ))}
+      {blocFinal && (
+        <div className="rounded-lg border-2 px-3.5 py-3" style={{ borderColor: C.accent }}>
+          <div className="flex items-center gap-2 mb-1.5">
+            <Sparkles size={13} color={C.accentFonce} />
+            <span className="text-xs font-semibold" style={{ color: C.accentFonce }}>{labelFinal}</span>
+            {blocFinal.points != null && (
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: C.bleuFond, color: C.encre }}>{blocFinal.points} pts</span>
+            )}
+          </div>
+          <BlocExercice numero="" difficulte={null} points={null} enonce={blocFinal.enonce} corrige={blocFinal.corrige} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RenduRessource({ type, contenu }) {
+  if (!contenu) return null;
+  // Repli : l'IA n'a pas respecté le schéma attendu, ou la ressource a été
+  // modifiée manuellement — on affiche simplement le texte.
+  if (contenu.texte !== undefined && Object.keys(contenu).length === 1) {
+    return <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: C.encreDoux }}>{contenu.texte}</p>;
+  }
+  switch (type) {
+    case "fiche_pedagogique": return <RenduFichePedagogique contenu={contenu} />;
+    case "resume": return <RenduResume contenu={contenu} />;
+    case "exercices": return <RenduExercices contenu={contenu} />;
+    case "qcm": return <RenduQcm contenu={contenu} />;
+    case "devoir": return <RenduDevoirOuControle contenu={contenu} cleFinale="probleme" labelFinal="Problème" />;
+    case "controle": return <RenduDevoirOuControle contenu={contenu} cleFinale="exercice_synthese" labelFinal="Exercice de synthèse" />;
+    default: return <p className="text-sm whitespace-pre-wrap" style={{ color: C.encreDoux }}>{contenu.texte || aplatirPourEdition(contenu)}</p>;
+  }
+}
+
 function EcranCoursDetail({ coursId, token, setVue }) {
   const [cours, setCours] = useState(null);
   const [chargement, setChargement] = useState(true);
@@ -1137,7 +1342,6 @@ function EcranCoursDetail({ coursId, token, setVue }) {
           const meta = TYPES_RESSOURCE.find((t) => t.key === r.type_ressource) || TYPES_RESSOURCE[0];
           const Icon = meta.icon;
           const enEdition = editionId === r.id;
-          const texte = r.contenu?.texte || "";
           return (
             <div key={r.id} className="rounded-xl p-5 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
               <div className="flex items-center justify-between mb-2.5">
@@ -1158,7 +1362,7 @@ function EcranCoursDetail({ coursId, token, setVue }) {
 
               {enEdition ? (
                 <>
-                  <textarea value={brouillon} onChange={(e) => setBrouillon(e.target.value)} rows={3}
+                  <textarea value={brouillon} onChange={(e) => setBrouillon(e.target.value)} rows={8}
                     className="eduai-focus eduai-textarea w-full rounded-lg px-3.5 py-2.5 text-sm border mb-3"
                     style={{ borderColor: C.accent, backgroundColor: C.fond, color: C.encre }} />
                   <div className="flex gap-2">
@@ -1172,10 +1376,13 @@ function EcranCoursDetail({ coursId, token, setVue }) {
                     </button>
                     <button onClick={() => setEditionId(null)} className="eduai-focus rounded-lg px-3.5 py-2 text-xs font-medium" style={{ color: C.encreDoux }}>Annuler</button>
                   </div>
+                  <p className="text-[11px] mt-2" style={{ color: C.encreAttenue }}>
+                    La modification remplace la mise en forme dédiée par un texte simple.
+                  </p>
                 </>
               ) : (
                 <>
-                  <p className="text-sm leading-relaxed mb-3" style={{ color: C.encreDoux }}>{texte}</p>
+                  <div className="mb-3"><RenduRessource type={r.type_ressource} contenu={r.contenu} /></div>
                   <div className="flex gap-2">
                     {r.statut !== "valide" && (
                       <button onClick={() => majRessource(r.id, { statut: "valide" })} disabled={enregistrement}
@@ -1184,7 +1391,7 @@ function EcranCoursDetail({ coursId, token, setVue }) {
                         <Check size={12} /> Valider
                       </button>
                     )}
-                    <button onClick={() => { setEditionId(r.id); setBrouillon(texte); }}
+                    <button onClick={() => { setEditionId(r.id); setBrouillon(r.contenu?.texte || aplatirPourEdition(r.contenu)); }}
                       className="eduai-focus flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium" style={{ backgroundColor: C.bleuFond, color: C.encre }}>
                       <Pencil size={12} /> Modifier
                     </button>
