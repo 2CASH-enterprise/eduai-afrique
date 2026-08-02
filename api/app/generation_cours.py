@@ -32,8 +32,35 @@ INSTRUCTIONS_PAR_TYPE = {
 
 SYSTEM_PROMPT = """Tu es un expert en pédagogie pour le Cameroun, qui aide un enseignant à préparer sa classe. \
 Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après, sans balises markdown. \
-Le JSON doit avoir exactement une clé : "texte" (le contenu demandé, en texte structuré, prêt à être relu \
-puis utilisé par l'enseignant)."""
+Le JSON doit avoir exactement une clé : "texte", dont la valeur est une SEULE CHAÎNE DE CARACTÈRES \
+(pas un objet, pas une liste) contenant tout le contenu demandé, mis en forme avec des sauts de ligne \
+et des tirets si besoin — jamais une structure JSON imbriquée."""
+
+
+def _aplatir_en_texte(valeur, niveau: int = 0) -> str:
+    """Convertit n'importe quelle valeur JSON en texte lisible. Filet de
+    sécurité : rien ne garantit qu'un modèle de langage respecte à 100% la
+    consigne "réponds avec une chaîne" — mieux vaut aplatir proprement une
+    structure inattendue que planter l'affichage côté enseignant (incident
+    du 02/08 : React refuse d'afficher un objet directement)."""
+    prefixe = "  " * niveau
+    if isinstance(valeur, str):
+        return valeur
+    if isinstance(valeur, (int, float, bool)) or valeur is None:
+        return str(valeur)
+    if isinstance(valeur, list):
+        return "\n".join(f"{prefixe}- {_aplatir_en_texte(v, niveau + 1)}" for v in valeur)
+    if isinstance(valeur, dict):
+        lignes = []
+        for cle, sous_valeur in valeur.items():
+            libelle = str(cle).replace("_", " ").capitalize()
+            sous_texte = _aplatir_en_texte(sous_valeur, niveau + 1)
+            if "\n" in sous_texte:
+                lignes.append(f"{prefixe}{libelle} :\n{sous_texte}")
+            else:
+                lignes.append(f"{prefixe}{libelle} : {sous_texte}")
+        return "\n".join(lignes)
+    return str(valeur)
 
 
 def _rechercher_contexte(matiere_nom: str, niveau_nom: str, titre_cours: str,
@@ -90,6 +117,11 @@ def generer_ressource(type_ressource: str, titre_cours: str, contenu_texte: str 
         )
         brut = reponse.choices[0].message.content
         donnees = json.loads(re.sub(r"^```json\s*|\s*```$", "", brut.strip()))
-        return {"texte": donnees.get("texte", "")}
+        # Filet de sécurité : si l'IA n'a pas mis la clé "texte", ou si sa
+        # valeur n'est pas une simple chaîne (objet/liste imbriqués malgré
+        # la consigne), on aplatit plutôt que de laisser passer une
+        # structure que le frontend ne saurait pas afficher.
+        valeur_texte = donnees.get("texte", donnees)
+        return {"texte": _aplatir_en_texte(valeur_texte)}
     except Exception as e:
         return {"texte": f"[Erreur de génération : {e}] {titre_cours}"}
