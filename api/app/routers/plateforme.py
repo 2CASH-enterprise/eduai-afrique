@@ -155,7 +155,13 @@ def importer_documents_en_masse(payload: DemandeImportDocuments, admin: AdminPla
             continue
 
         try:
-            reponse = httpx.get(ligne.url, timeout=60.0, follow_redirects=True)
+            # Certains serveurs (ex : sites d'établissements scolaires)
+            # rejettent les requêtes sans en-tête User-Agent de navigateur —
+            # incident constaté le 02/08 avec un vrai lien PDF sénégalais.
+            reponse = httpx.get(
+                ligne.url, timeout=60.0, follow_redirects=True,
+                headers={"User-Agent": "Mozilla/5.0 (compatible; EduAI-Afrique/1.0; +https://89.116.111.3)"},
+            )
             reponse.raise_for_status()
             contenu = reponse.content
             if not contenu.startswith(b"%PDF-"):
