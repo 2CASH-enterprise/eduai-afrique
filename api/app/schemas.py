@@ -624,6 +624,31 @@ class ExerciceBiblioCommune(BaseModel):
     created_at: datetime
 
 
+class LigneImportDocument(BaseModel):
+    titre: str
+    url: str
+    matiere: str  # nom, ex : "Mathématiques" — résolu en matiere_id côté serveur
+    pays: str
+
+
+class DemandeImportDocuments(BaseModel):
+    documents: list[LigneImportDocument]
+
+
+class ResultatLigneImportDocument(BaseModel):
+    titre: str
+    statut: str  # 'cree' | 'erreur'
+    document_id: str | None = None
+    erreur: str | None = None
+
+
+class RapportImportDocuments(BaseModel):
+    total: int
+    nombre_crees: int
+    nombre_erreurs: int
+    resultats: list[ResultatLigneImportDocument]
+
+
 # ---------------------------------------------------------------------------
 # Enseignant indépendant : auto-inscription, invitations, génération libre
 # ---------------------------------------------------------------------------

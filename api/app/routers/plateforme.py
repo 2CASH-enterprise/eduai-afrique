@@ -1,5 +1,6 @@
 import secrets
 
+import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
 from .. import rag
@@ -8,7 +9,8 @@ from ..deps import get_admin_plateforme_connecte
 from ..security import hacher_mot_de_passe
 from ..schemas import (AdminPlateformeConnecte, DocumentPedagogique, PassageRecherche,
                         EtablissementResume, CreationEtablissement, EtablissementCree, CompteCree,
-                        ExerciceBiblioCommune)
+                        ExerciceBiblioCommune, LigneImportDocument, DemandeImportDocuments,
+                        ResultatLigneImportDocument, RapportImportDocuments)
 
 router = APIRouter(prefix="/plateforme", tags=["admin-plateforme"])
 
@@ -130,6 +132,64 @@ def tester_recherche(document_id: str, q: str, admin: AdminPlateformeConnecte = 
         resultats = cur.fetchall()
 
     return [PassageRecherche(extrait=contenu[:300], similarite=round(float(sim), 3)) for contenu, sim in resultats]
+
+
+@router.post("/documents/import", response_model=RapportImportDocuments)
+def importer_documents_en_masse(payload: DemandeImportDocuments, admin: AdminPlateformeConnecte = Depends(get_admin_plateforme_connecte)):
+    """Dépose plusieurs programmes officiels d'un coup à partir de leurs URL
+    (ex : catalogue d'un ministère). Une transaction PAR DOCUMENT — comme
+    pour l'import CSV des utilisateurs, l'échec d'une ligne n'annule jamais
+    les précédentes. Peut prendre plusieurs minutes selon le nombre et la
+    taille des documents (téléchargement + indexation de chacun)."""
+    resultats = []
+
+    with get_cursor() as cur:
+        cur.execute("SELECT id, nom FROM matieres")
+        matieres_par_nom = {nom.lower(): str(id_) for id_, nom in cur.fetchall()}
+
+    for ligne in payload.documents:
+        matiere_id = matieres_par_nom.get(ligne.matiere.lower())
+        if matiere_id is None:
+            resultats.append(ResultatLigneImportDocument(
+                titre=ligne.titre, statut="erreur", erreur=f"Matière inconnue : « {ligne.matiere} »"))
+            continue
+
+        try:
+            reponse = httpx.get(ligne.url, timeout=60.0, follow_redirects=True)
+            reponse.raise_for_status()
+            contenu = reponse.content
+            if not contenu.startswith(b"%PDF-"):
+                raise ValueError("Le fichier téléchargé n'est pas un PDF valide")
+
+            with get_cursor(commit=True) as cur:
+                cur.execute(
+                    """
+                    INSERT INTO documents_pedagogiques
+                        (etablissement_id, depose_par_id, type_document, matiere_id, titre, pays, statut)
+                    VALUES (NULL, %s, 'programme_officiel', %s, %s, %s, 'en_traitement')
+                    RETURNING id
+                    """,
+                    (admin.id, matiere_id, ligne.titre, ligne.pays),
+                )
+                document_id = cur.fetchone()[0]
+
+            rag.ingerer_document(document_id, contenu)
+
+            with get_cursor() as cur:
+                cur.execute("SELECT statut, erreur_traitement FROM documents_pedagogiques WHERE id = %s", (document_id,))
+                statut_final, erreur_final = cur.fetchone()
+
+            if statut_final == "erreur":
+                resultats.append(ResultatLigneImportDocument(
+                    titre=ligne.titre, statut="erreur", document_id=str(document_id), erreur=erreur_final))
+            else:
+                resultats.append(ResultatLigneImportDocument(titre=ligne.titre, statut="cree", document_id=str(document_id)))
+        except Exception as e:
+            resultats.append(ResultatLigneImportDocument(titre=ligne.titre, statut="erreur", erreur=str(e)))
+
+    nombre_crees = sum(1 for r in resultats if r.statut == "cree")
+    return RapportImportDocuments(total=len(resultats), nombre_crees=nombre_crees,
+                                    nombre_erreurs=len(resultats) - nombre_crees, resultats=resultats)
 
 
 # ---------------------------------------------------------------------------

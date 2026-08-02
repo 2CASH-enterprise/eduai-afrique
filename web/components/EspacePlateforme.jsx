@@ -414,6 +414,82 @@ function FormulaireDepotProgramme({ token, onDepose }) {
   );
 }
 
+function FormulaireImportMasse({ token, onImporte }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [texte, setTexte] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState(null);
+  const [rapport, setRapport] = useState(null);
+
+  function parserLignes() {
+    return texte.split("\n").map((l) => l.trim()).filter(Boolean).map((ligne) => {
+      const [titre, url, matiere, pays] = ligne.split(";").map((c) => c.trim());
+      return { titre, url, matiere, pays };
+    });
+  }
+
+  async function soumettre(e) {
+    e.preventDefault();
+    setEnvoi(true); setErreur(null); setRapport(null);
+    try {
+      const documents = parserLignes();
+      if (documents.some((d) => !d.titre || !d.url || !d.matiere || !d.pays)) {
+        setErreur("Chaque ligne doit avoir 4 champs séparés par des point-virgules : titre;url;matière;pays");
+        return;
+      }
+      const resultat = await apiFetch("/plateforme/documents/import", { method: "POST", token, body: { documents } });
+      setRapport(resultat);
+      if (resultat.nombre_crees > 0) onImporte();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoi(false); }
+  }
+
+  if (!ouvert) {
+    return (
+      <button onClick={() => setOuvert(true)} className="eduai-focus flex items-center gap-1.5 text-xs font-medium ml-4" style={{ color: C.accentFonce }}>
+        <Upload size={13} /> Importer en masse (par URL)
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={soumettre} className="rounded-lg p-4 border space-y-2.5" style={{ borderColor: C.ligne, backgroundColor: C.fond }}>
+      <BandeauErreur message={erreur} />
+      <p className="text-xs" style={{ color: C.encreDoux }}>
+        Une ligne par document, format : <span className="eduai-mono">titre;url;matière;pays</span>
+      </p>
+      <textarea required value={texte} onChange={(e) => setTexte(e.target.value)} rows={6}
+        placeholder={"Programme Maths 6ème CI;https://exemple.gouv.ci/maths6e.pdf;Mathématiques;Côte d'Ivoire\nProgramme SVT 5ème CI;https://exemple.gouv.ci/svt5e.pdf;SVT;Côte d'Ivoire"}
+        className="eduai-focus eduai-mono w-full rounded-lg px-3 py-2 text-xs outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }} />
+      <div className="flex gap-2 pt-1">
+        <button type="submit" disabled={envoi} className="eduai-focus rounded-lg px-3.5 py-2 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
+          {envoi ? <Loader2 size={12} className="eduai-spin" /> : "Importer"}
+        </button>
+        <button type="button" onClick={() => { setOuvert(false); setRapport(null); }} className="eduai-focus text-xs font-medium" style={{ color: C.encreDoux }}>Fermer</button>
+      </div>
+      {envoi && (
+        <p className="text-xs" style={{ color: C.encreAttenue }}>
+          Téléchargement et indexation en cours, peut prendre plusieurs minutes selon le nombre de documents...
+        </p>
+      )}
+      {rapport && (
+        <div className="rounded-lg p-3 mt-2" style={{ backgroundColor: C.surface, border: `1px solid ${C.ligne}` }}>
+          <p className="text-xs font-semibold mb-2" style={{ color: C.encre }}>
+            {rapport.nombre_crees} réussi{rapport.nombre_crees > 1 ? "s" : ""} / {rapport.total} — {rapport.nombre_erreurs} erreur{rapport.nombre_erreurs > 1 ? "s" : ""}
+          </p>
+          <div className="space-y-1">
+            {rapport.resultats.map((r, i) => (
+              <p key={i} className="text-[11px]" style={{ color: r.statut === "cree" ? C.vert : C.rouge }}>
+                {r.statut === "cree" ? "✓" : "✗"} {r.titre}{r.erreur ? ` — ${r.erreur}` : ""}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+    </form>
+  );
+}
+
 function EcranDocuments({ token }) {
   const [documents, setDocuments] = useState([]);
   const [chargement, setChargement] = useState(true);
@@ -445,7 +521,10 @@ function EcranDocuments({ token }) {
 
       <div className="rounded-2xl p-6 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
         <h2 className="eduai-display text-lg mb-4" style={{ color: C.encre }}>Programmes officiels</h2>
-        <FormulaireDepotProgramme token={token} onDepose={charger} />
+        <div className="flex items-center flex-wrap gap-y-2">
+          <FormulaireDepotProgramme token={token} onDepose={charger} />
+          <FormulaireImportMasse token={token} onImporte={charger} />
+        </div>
 
         {chargement ? <Chargement /> : (
           <div className="space-y-2 mt-5">
