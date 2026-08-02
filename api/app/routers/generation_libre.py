@@ -40,13 +40,13 @@ def consulter_mes_credits(enseignant: EnseignantConnecte = Depends(get_enseignan
 
 
 def _rechercher_contexte_libre(matiere_nom: str, niveau: str, theme: str, matiere_id: str,
-                                 etablissement_id: str | None, enseignant_id: str) -> list[str]:
+                                 etablissement_id: str | None, enseignant_id: str, pays: str | None) -> list[str]:
     """Best-effort, comme partout ailleurs où le RAG enrichit une
     génération : jamais bloquant, jamais visible de l'utilisateur en cas
     d'échec — juste moins de contexte pour cette génération précise. Pas de
     niveau_id disponible ici (niveaux n'est pas une table globale, voir
     TODO.md point 3 et le module generation_libre) : le filtre se fait
-    uniquement sur la matière."""
+    sur la matière et le pays de l'enseignant."""
     try:
         client = rag.obtenir_client_mistral()
         if client is None:
@@ -55,7 +55,7 @@ def _rechercher_contexte_libre(matiere_nom: str, niveau: str, theme: str, matier
         with get_cursor() as cur:
             return rag.rechercher_passages_pertinents(
                 cur, embedding, niveau_id=None, matiere_id=matiere_id,
-                etablissement_id=etablissement_id, utilisateur_id_demandeur=enseignant_id, k=4,
+                etablissement_id=etablissement_id, utilisateur_id_demandeur=enseignant_id, pays=pays, k=4,
             )
     except Exception:
         return []
@@ -89,7 +89,7 @@ def generer_en_mode_libre(payload: DemandeGenerationLibre, enseignant: Enseignan
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Matière introuvable")
 
     passages = _rechercher_contexte_libre(row_matiere[0], payload.niveau, payload.theme,
-                                            payload.matiere_id, enseignant.etablissement_id, enseignant.id)
+                                            payload.matiere_id, enseignant.etablissement_id, enseignant.id, enseignant.pays)
 
     donnees = generer_exercice_a_la_demande(matiere=row_matiere[0], niveau=payload.niveau, theme=payload.theme,
                                               passages_contexte=passages)

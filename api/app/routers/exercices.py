@@ -41,7 +41,7 @@ def _charger_exercice_ou_404(cur, exercice_id: str):
         """
         SELECT e.id, e.niveau_id, e.matiere_id, n.nom AS niveau_nom, m.nom AS matiere_nom,
                e.theme, e.sous_theme, e.difficulte, e.enonce, e.corrige, e.etapes,
-               e.contexte, e.tags, e.source, e.validation_ia, e.statut, e.created_at
+               e.contexte, e.tags, e.source, e.validation_ia, e.statut, e.created_at, e.pays
         FROM exercices e
         JOIN niveaux n ON n.id = e.niveau_id
         JOIN matieres m ON m.id = e.matiere_id
@@ -168,7 +168,7 @@ def valider_exercice(
     # la validation elle-même en cas de souci d'indexation.
     texte_exercice = "\n".join(filter(None, [row[5], row[8], row[9], "\n".join(row[10] or [])]))
     rag.reinjecter_contenu_valide(titre=row[5] or "Exercice validé", texte=texte_exercice,
-                                    niveau_id=row[1], matiere_id=row[2])
+                                    niveau_id=row[1], matiere_id=row[2], pays=row[17])
 
     return ExerciceValide(id=str(resultat[0]), statut=resultat[1],
                            valide_par_id=str(resultat[2]), date_validation=resultat[3])

@@ -27,6 +27,7 @@ def _generer_mot_de_passe_provisoire() -> str:
 @router.post("/documents", response_model=DocumentPedagogique, status_code=status.HTTP_201_CREATED)
 async def deposer_programme_officiel(
     titre: str,
+    pays: str,
     niveau_id: str | None = None,
     matiere_id: str | None = None,
     fichier: UploadFile = File(...),
@@ -40,11 +41,11 @@ async def deposer_programme_officiel(
         cur.execute(
             """
             INSERT INTO documents_pedagogiques
-                (etablissement_id, depose_par_id, type_document, niveau_id, matiere_id, titre, statut)
-            VALUES (NULL, %s, 'programme_officiel', %s, %s, %s, 'en_traitement')
+                (etablissement_id, depose_par_id, type_document, niveau_id, matiere_id, titre, pays, statut)
+            VALUES (NULL, %s, 'programme_officiel', %s, %s, %s, %s, 'en_traitement')
             RETURNING id
             """,
-            (admin.id, niveau_id, matiere_id, titre),
+            (admin.id, niveau_id, matiere_id, titre, pays),
         )
         document_id = cur.fetchone()[0]
 
@@ -53,7 +54,7 @@ async def deposer_programme_officiel(
     with get_cursor() as cur:
         cur.execute(
             """
-            SELECT d.id, d.type_document, n.nom, m.nom, d.titre, d.nombre_pages, d.statut, d.erreur_traitement,
+            SELECT d.id, d.type_document, d.pays, n.nom, m.nom, d.titre, d.nombre_pages, d.statut, d.erreur_traitement,
                    (SELECT COUNT(*) FROM passages_documents p WHERE p.document_id = d.id)
             FROM documents_pedagogiques d
             LEFT JOIN niveaux n ON n.id = d.niveau_id
@@ -64,8 +65,8 @@ async def deposer_programme_officiel(
         )
         row = cur.fetchone()
 
-    id_, type_doc, niveau, matiere, titre_, nb_pages, statut, erreur, nb_passages = row
-    return DocumentPedagogique(id=str(id_), type_document=type_doc, niveau=niveau, matiere=matiere,
+    id_, type_doc, pays_doc, niveau, matiere, titre_, nb_pages, statut, erreur, nb_passages = row
+    return DocumentPedagogique(id=str(id_), type_document=type_doc, pays=pays_doc, niveau=niveau, matiere=matiere,
                                  titre=titre_, nombre_pages=nb_pages, statut=statut,
                                  erreur_traitement=erreur, nombre_passages=nb_passages)
 
@@ -75,7 +76,7 @@ def lister_programmes_officiels(admin: AdminPlateformeConnecte = Depends(get_adm
     with get_cursor() as cur:
         cur.execute(
             """
-            SELECT d.id, d.type_document, n.nom, m.nom, d.titre, d.nombre_pages, d.statut, d.erreur_traitement,
+            SELECT d.id, d.type_document, d.pays, n.nom, m.nom, d.titre, d.nombre_pages, d.statut, d.erreur_traitement,
                    (SELECT COUNT(*) FROM passages_documents p WHERE p.document_id = d.id)
             FROM documents_pedagogiques d
             LEFT JOIN niveaux n ON n.id = d.niveau_id
@@ -85,9 +86,9 @@ def lister_programmes_officiels(admin: AdminPlateformeConnecte = Depends(get_adm
             """
         )
         lignes = cur.fetchall()
-    return [DocumentPedagogique(id=str(id_), type_document=t, niveau=n, matiere=m, titre=titre,
+    return [DocumentPedagogique(id=str(id_), type_document=t, pays=pays_doc, niveau=n, matiere=m, titre=titre,
                                   nombre_pages=np, statut=s, erreur_traitement=e, nombre_passages=npass)
-            for id_, t, n, m, titre, np, s, e, npass in lignes]
+            for id_, t, pays_doc, n, m, titre, np, s, e, npass in lignes]
 
 
 @router.delete("/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)

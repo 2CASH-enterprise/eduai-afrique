@@ -23,9 +23,10 @@ def get_enseignant_connecte(token: str = Depends(_oauth2_scheme)) -> EnseignantC
     with get_cursor() as cur:
         cur.execute(
             """
-            SELECT u.id, u.nom, u.prenom, u.etablissement_id
+            SELECT u.id, u.nom, u.prenom, u.etablissement_id, COALESCE(et.pays, u.pays)
             FROM utilisateurs u
             JOIN enseignants e ON e.utilisateur_id = u.id
+            LEFT JOIN etablissements et ON et.id = u.etablissement_id
             WHERE u.id = %s AND u.role = 'enseignant' AND u.actif = true AND u.deleted_at IS NULL
             """,
             (utilisateur_id,),
@@ -36,7 +37,7 @@ def get_enseignant_connecte(token: str = Depends(_oauth2_scheme)) -> EnseignantC
         raise erreur_auth
 
     return EnseignantConnecte(id=str(row[0]), nom=row[1], prenom=row[2],
-                               etablissement_id=str(row[3]) if row[3] else None)
+                               etablissement_id=str(row[3]) if row[3] else None, pays=row[4])
 
 
 def get_eleve_connecte(token: str = Depends(_oauth2_scheme)) -> EleveConnecte:

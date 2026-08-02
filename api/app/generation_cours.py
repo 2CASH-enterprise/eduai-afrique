@@ -38,7 +38,7 @@ puis utilisé par l'enseignant)."""
 
 def _rechercher_contexte(matiere_nom: str, niveau_nom: str, titre_cours: str,
                           niveau_id: str | None, matiere_id: str | None,
-                          etablissement_id: str | None, enseignant_id: str) -> list[str]:
+                          etablissement_id: str | None, enseignant_id: str, pays: str | None) -> list[str]:
     """Best-effort : une panne d'indexation ou d'embedding ne doit jamais
     empêcher la génération elle-même — juste la priver de contexte enrichi."""
     try:
@@ -49,7 +49,7 @@ def _rechercher_contexte(matiere_nom: str, niveau_nom: str, titre_cours: str,
         with get_cursor() as cur:
             return rag.rechercher_passages_pertinents(
                 cur, embedding, niveau_id=niveau_id, matiere_id=matiere_id,
-                etablissement_id=etablissement_id, utilisateur_id_demandeur=enseignant_id, k=4,
+                etablissement_id=etablissement_id, utilisateur_id_demandeur=enseignant_id, pays=pays, k=4,
             )
     except Exception:
         return []
@@ -58,9 +58,9 @@ def _rechercher_contexte(matiere_nom: str, niveau_nom: str, titre_cours: str,
 def generer_ressource(type_ressource: str, titre_cours: str, contenu_texte: str | None,
                        matiere_nom: str, niveau_nom: str,
                        niveau_id: str | None, matiere_id: str | None,
-                       etablissement_id: str | None, enseignant_id: str) -> dict:
+                       etablissement_id: str | None, enseignant_id: str, pays: str | None = None) -> dict:
     passages = _rechercher_contexte(matiere_nom, niveau_nom, titre_cours,
-                                      niveau_id, matiere_id, etablissement_id, enseignant_id)
+                                      niveau_id, matiere_id, etablissement_id, enseignant_id, pays)
 
     prompt = (
         f"Prépare {INSTRUCTIONS_PAR_TYPE[type_ressource]}\n\n"

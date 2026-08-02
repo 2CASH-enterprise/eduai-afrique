@@ -59,11 +59,11 @@ def inscription_enseignant(payload: InscriptionEnseignant):
 
         cur.execute(
             """
-            INSERT INTO utilisateurs (etablissement_id, role, email, mot_de_passe_hash, nom, prenom)
-            VALUES (NULL, 'enseignant', %s, %s, %s, %s)
+            INSERT INTO utilisateurs (etablissement_id, role, email, mot_de_passe_hash, nom, prenom, pays)
+            VALUES (NULL, 'enseignant', %s, %s, %s, %s, %s)
             RETURNING id
             """,
-            (payload.email, hacher_mot_de_passe(payload.mot_de_passe), payload.nom, payload.prenom),
+            (payload.email, hacher_mot_de_passe(payload.mot_de_passe), payload.nom, payload.prenom, payload.pays),
         )
         utilisateur_id = cur.fetchone()[0]
         cur.execute("INSERT INTO enseignants (utilisateur_id, specialite) VALUES (%s, %s)",

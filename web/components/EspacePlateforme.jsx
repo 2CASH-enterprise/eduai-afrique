@@ -357,9 +357,14 @@ function BadgeStatutDocument({ statut }) {
   return <span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: s.bg, color: s.fg }}>{s.label}</span>;
 }
 
+const PAYS_DISPONIBLES = [
+  "Cameroun", "Sénégal", "Côte d'Ivoire", "République démocratique du Congo", "Bénin", "Togo", "Gabon",
+];
+
 function FormulaireDepotProgramme({ token, onDepose }) {
   const [ouvert, setOuvert] = useState(false);
   const [titre, setTitre] = useState("");
+  const [pays, setPays] = useState(PAYS_DISPONIBLES[0]);
   const [fichier, setFichier] = useState(null);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState(null);
@@ -371,7 +376,7 @@ function FormulaireDepotProgramme({ token, onDepose }) {
     try {
       const formData = new FormData();
       formData.append("fichier", fichier);
-      await apiFetch("/plateforme/documents", { method: "POST", token, params: { titre }, body: formData });
+      await apiFetch("/plateforme/documents", { method: "POST", token, params: { titre, pays }, body: formData });
       setTitre(""); setFichier(null); setOuvert(false);
       onDepose();
     } catch (e) { setErreur(e.message); }
@@ -391,6 +396,10 @@ function FormulaireDepotProgramme({ token, onDepose }) {
       <BandeauErreur message={erreur} />
       <input required value={titre} onChange={(e) => setTitre(e.target.value)} placeholder="Titre (ex : Programme Maths 6ème — MINESEC)"
         className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }} />
+      <select value={pays} onChange={(e) => setPays(e.target.value)} required
+        className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }}>
+        {PAYS_DISPONIBLES.map((p) => <option key={p} value={p}>{p}</option>)}
+      </select>
       <label className="eduai-focus flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium border cursor-pointer w-fit" style={{ borderColor: C.ligne, color: C.encre, backgroundColor: C.surface }}>
         <Upload size={12} />{fichier ? fichier.name : "Choisir un PDF"}
         <input type="file" accept="application/pdf" className="hidden" onChange={(e) => setFichier(e.target.files[0] || null)} />
@@ -447,7 +456,7 @@ function EcranDocuments({ token }) {
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate" style={{ color: C.encre }}>{d.titre}</p>
                     <p className="text-xs" style={{ color: C.encreAttenue }}>
-                      {[d.niveau, d.matiere].filter(Boolean).join(" · ") || "Niveau/matière non précisés"}
+                      {d.pays ? `${d.pays} · ` : ""}{[d.niveau, d.matiere].filter(Boolean).join(" · ") || "Niveau/matière non précisés"}
                       {d.nombre_pages ? ` · ${d.nombre_pages} page${d.nombre_pages > 1 ? "s" : ""}` : ""}
                     </p>
                   </div>

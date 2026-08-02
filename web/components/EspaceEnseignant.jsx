@@ -223,18 +223,23 @@ function ChipMatiere({ label, active, onClick, icon: Icon }) {
 /*  Écran : Connexion                                                   */
 /* ------------------------------------------------------------------ */
 
+const PAYS_DISPONIBLES = [
+  "Cameroun", "Sénégal", "Côte d'Ivoire", "République démocratique du Congo", "Bénin", "Togo", "Gabon",
+];
+
 function EcranConnexion({ onConnexion, onInscription, connexionEnCours, erreurConnexion }) {
   const [mode, setMode] = useState("connexion"); // "connexion" | "inscription"
   const [email, setEmail] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
   const [nom, setNom] = useState("");
   const [prenom, setPrenom] = useState("");
+  const [pays, setPays] = useState("Cameroun");
   const [specialite, setSpecialite] = useState("");
 
   function soumettre(e) {
     e.preventDefault();
     if (mode === "connexion") onConnexion(email, motDePasse);
-    else onInscription({ email, mot_de_passe: motDePasse, nom, prenom, specialite: specialite || null });
+    else onInscription({ email, mot_de_passe: motDePasse, nom, prenom, pays, specialite: specialite || null });
   }
 
   return (
@@ -276,6 +281,19 @@ function EcranConnexion({ onConnexion, onInscription, connexionEnCours, erreurCo
                 <input required value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom"
                   className="eduai-focus rounded-lg px-3.5 py-2.5 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
               </div>
+            )}
+            {mode === "inscription" && (
+              <label className="block">
+                <span className="text-xs font-medium mb-1.5 block" style={{ color: C.encreDoux }}>Pays</span>
+                <select value={pays} onChange={(e) => setPays(e.target.value)}
+                  className="eduai-focus w-full rounded-lg px-3.5 py-2.5 text-sm outline-none border"
+                  style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}>
+                  {PAYS_DISPONIBLES.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+                <span className="text-[11px] mt-1 block" style={{ color: C.encreAttenue }}>
+                  Détermine quel programme officiel sert de référence à vos générations.
+                </span>
+              </label>
             )}
             <label className="block">
               <span className="text-xs font-medium mb-1.5 flex items-center gap-1.5" style={{ color: C.encreDoux }}>

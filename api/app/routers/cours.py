@@ -90,25 +90,28 @@ def deposer_cours(
 
         if payload.classe_id:
             cur.execute(
-                "SELECT c.nom, c.niveau_id, n.nom, c.etablissement_id FROM classes c "
-                "JOIN niveaux n ON n.id = c.niveau_id WHERE c.id = %s",
+                "SELECT c.nom, c.niveau_id, n.nom, c.etablissement_id, e.pays FROM classes c "
+                "JOIN niveaux n ON n.id = c.niveau_id JOIN etablissements e ON e.id = c.etablissement_id "
+                "WHERE c.id = %s",
                 (payload.classe_id,),
             )
-            classe_nom, niveau_id, niveau_nom, etablissement_id = cur.fetchone()
+            classe_nom, niveau_id, niveau_nom, etablissement_id, pays = cur.fetchone()
             niveau_id, etablissement_id = str(niveau_id), str(etablissement_id)
         else:
             # Pas de niveau_id (texte libre, aucune table de niveaux
             # globale) ni d'établissement — le RAG se limite alors au
-            # contenu partagé plateforme entière, filtré par matière.
+            # contenu partagé plateforme entière, filtré par matière et
+            # par le pays propre de l'enseignant indépendant.
             cur.execute("SELECT nom, niveau FROM classes_personnelles WHERE id = %s", (payload.classe_personnelle_id,))
             classe_nom, niveau_nom = cur.fetchone()
             niveau_id, etablissement_id = None, None
+            pays = enseignant.pays
 
         ressources = []
         for type_ressource in TYPES_RESSOURCE:
             contenu = generation_cours.generer_ressource(
                 type_ressource, titre, contenu_texte, matiere_nom, niveau_nom,
-                niveau_id, payload.matiere_id, etablissement_id, enseignant.id,
+                niveau_id, payload.matiere_id, etablissement_id, enseignant.id, pays,
             )
             cur.execute(
                 """
@@ -214,19 +217,21 @@ def modifier_ressource(
         # l'enseignant est une création propre de la plateforme, réinjectée
         # pour enrichir les futures générations — jamais consultable comme
         # document par ailleurs (voir rag.reinjecter_contenu_valide).
-        texte, niveau_id, matiere_id, titre_reinjection = None, None, None, None
+        texte, niveau_id, matiere_id, titre_reinjection, pays = None, None, None, None, None
         if payload.statut == "valide":
             cur.execute(
                 """
-                SELECT c.matiere_id, cl.niveau_id, c.titre, r.type_ressource, r.contenu
+                SELECT c.matiere_id, cl.niveau_id, c.titre, r.type_ressource, r.contenu, e.pays
                 FROM ressources_generees r
                 JOIN cours c ON c.id = r.cours_id
                 LEFT JOIN classes cl ON cl.id = c.classe_id
+                LEFT JOIN etablissements e ON e.id = cl.etablissement_id
                 WHERE r.id = %s
                 """,
                 (ressource_id,),
             )
-            matiere_id, niveau_id, titre_cours, type_ressource, contenu_json = cur.fetchone()
+            matiere_id, niveau_id, titre_cours, type_ressource, contenu_json, pays = cur.fetchone()
+            pays = pays or enseignant.pays  # classe personnelle : pas d'établissement, on retombe sur l'enseignant
             if contenu_json:
                 donnees = contenu_json if isinstance(contenu_json, dict) else json.loads(contenu_json)
                 texte = donnees.get("texte")
@@ -234,6 +239,6 @@ def modifier_ressource(
 
     if texte:
         rag.reinjecter_contenu_valide(titre=titre_reinjection, texte=texte,
-                                        niveau_id=niveau_id, matiere_id=matiere_id)
+                                        niveau_id=niveau_id, matiere_id=matiere_id, pays=pays)
 
     return {"statut": "ok"}

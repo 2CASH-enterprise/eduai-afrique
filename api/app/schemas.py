@@ -17,6 +17,9 @@ class EnseignantConnecte(BaseModel):
     nom: str
     prenom: str
     etablissement_id: str | None
+    pays: str | None
+    # Résolu une fois pour toutes à la connexion : celui de l'établissement
+    # s'il y en a un, sinon le pays propre de l'enseignant indépendant.
 
 
 class ExerciceEnAttente(BaseModel):
@@ -532,6 +535,7 @@ class CreationChapitre(BaseModel):
 class DocumentPedagogique(BaseModel):
     id: str
     type_document: str
+    pays: str | None = None
     niveau: str | None
     matiere: str | None
     titre: str
@@ -629,6 +633,7 @@ class InscriptionEnseignant(BaseModel):
     mot_de_passe: str
     nom: str
     prenom: str
+    pays: str
     specialite: str | None = None
 
 

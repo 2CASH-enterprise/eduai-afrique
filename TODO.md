@@ -258,6 +258,35 @@ de formule (upgrade/downgrade — qui déclenche ça, l'Admin Plateforme ?).
 
 ---
 
+## 14. Segmentation du corpus documentaire par pays — ✅ FAIT le 02/08
+
+**Découvert en préparant le dépôt des programmes officiels de Côte
+d'Ivoire, Sénégal, RDC, Bénin, Togo et Gabon** : `documents_pedagogiques`
+n'avait aucun champ `pays`, contrairement à `exercices` qui en avait déjà
+un. Concrètement, sans correction, un programme officiel camerounais
+aurait pu influencer une génération demandée au Sénégal, et inversement —
+aucune segmentation n'existait, seuls le niveau et la matière filtraient
+la recherche RAG.
+
+**Construit et déployé** :
+- `documents_pedagogiques.pays` (obligatoire) et `utilisateurs.pays`
+  (optionnel, pour les enseignants indépendants uniquement — les autres
+  l'obtiennent via leur établissement).
+- `rag.rechercher_passages_pertinents` et `reinjecter_contenu_valide`
+  filtrent/enregistrent désormais le pays.
+- Le pays est résolu automatiquement pour chaque enseignant à la connexion
+  (établissement en priorité, sinon le sien propre) et transmis
+  correctement à chaque point de génération (Déposer un cours — y compris
+  le cas multi-établissement où la classe peut appartenir à un pays
+  différent de l'établissement principal —, Génération libre).
+- Un admin d'établissement ne voit plus, dans son onglet Documents, que
+  les programmes officiels de son propre pays.
+- Formulaires mis à jour : inscription enseignant indépendant (sélecteur
+  de pays), dépôt de programme officiel côté Admin Plateforme (pays
+  obligatoire, affiché dans la liste).
+
+---
+
 ## 13. Upgrade du compte élève par le parent (n'existe pas encore)
 
 **Besoin exprimé le 01/08** : un parent doit pouvoir payer pour débloquer

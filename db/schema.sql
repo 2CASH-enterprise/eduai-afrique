@@ -125,6 +125,9 @@ CREATE TABLE utilisateurs (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     etablissement_id    UUID REFERENCES etablissements(id) ON DELETE CASCADE,
     -- NULL possible pour un admin plateforme multi-établissements
+    pays                TEXT,
+    -- Seulement pertinent pour un enseignant indépendant (etablissement_id
+    -- NULL) — pour tout le monde d'autre, le pays vient de l'établissement.
     role                TEXT NOT NULL
                         CHECK (role IN ('admin_plateforme', 'direction', 'administratif',
                                          'enseignant', 'eleve', 'parent')),
@@ -455,6 +458,7 @@ CREATE TABLE documents_pedagogiques (
     depose_par_id       UUID REFERENCES utilisateurs(id),
     type_document        TEXT NOT NULL DEFAULT 'notes_cours'
                         CHECK (type_document IN ('programme_officiel', 'notes_cours', 'genere_valide')),
+    pays                TEXT NOT NULL,                 -- isole le corpus par pays (voir migration 009)
     niveau_id           UUID REFERENCES niveaux(id),
     matiere_id          UUID REFERENCES matieres(id),
     titre               TEXT NOT NULL,
@@ -470,6 +474,7 @@ CREATE TABLE documents_pedagogiques (
 );
 CREATE INDEX idx_documents_etablissement ON documents_pedagogiques(etablissement_id);
 CREATE INDEX idx_documents_niveau_matiere ON documents_pedagogiques(niveau_id, matiere_id);
+CREATE INDEX idx_documents_pays ON documents_pedagogiques(pays);
 
 -- Partage explicite d'une note de cours avec un ou plusieurs collègues du
 -- même établissement — jamais automatique, jamais entre établissements.

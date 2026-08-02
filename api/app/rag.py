@@ -105,13 +105,17 @@ def ingerer_document(document_id: str, contenu_pdf: bytes) -> None:
             )
 
 
-def reinjecter_contenu_valide(titre: str, texte: str, niveau_id: str | None, matiere_id: str | None) -> None:
+def reinjecter_contenu_valide(titre: str, texte: str, niveau_id: str | None, matiere_id: str | None,
+                                pays: str) -> None:
     """Type 3 du corpus documentaire : une fois qu'un cours ou un exercice a
     été généré par l'IA ET validé par un enseignant, son contenu enrichit
     silencieusement le corpus — portée plateforme entière (etablissement_id
     NULL, comme programme_officiel), jamais consultable comme document
     (aucun endpoint de listing ne l'expose), aucun problème de droit
-    d'auteur puisque c'est une création de la plateforme elle-même.
+    d'auteur puisque c'est une création de la plateforme elle-même. Le pays
+    est celui du contexte qui a produit ce contenu (établissement ou
+    enseignant indépendant) — évite qu'un contenu généré au Cameroun
+    enrichisse les générations au Sénégal (voir migration 009).
 
     Appelée depuis les endpoints de validation (exercices.py, cours.py).
     Best-effort : une panne d'embedding ne doit jamais faire échouer la
@@ -127,11 +131,11 @@ def reinjecter_contenu_valide(titre: str, texte: str, niveau_id: str | None, mat
             cur.execute(
                 """
                 INSERT INTO documents_pedagogiques
-                    (etablissement_id, depose_par_id, type_document, niveau_id, matiere_id, titre, statut)
-                VALUES (NULL, NULL, 'genere_valide', %s, %s, %s, 'en_traitement')
+                    (etablissement_id, depose_par_id, type_document, niveau_id, matiere_id, titre, pays, statut)
+                VALUES (NULL, NULL, 'genere_valide', %s, %s, %s, %s, 'en_traitement')
                 RETURNING id
                 """,
-                (niveau_id, matiere_id, titre),
+                (niveau_id, matiere_id, titre, pays),
             )
             document_id = cur.fetchone()[0]
 
@@ -170,11 +174,13 @@ def rechercher_passages_pertinents(cur, requete_embedding: list[float],
                                      niveau_id: str | None = None, matiere_id: str | None = None,
                                      etablissement_id: str | None = None,
                                      utilisateur_id_demandeur: str | None = None,
+                                     pays: str | None = None,
                                      k: int = 5) -> list[str]:
     """Fonction de récupération RAG — PAS un endpoint public. Combine trois
     sources selon les règles de partage retenues :
       - programme_officiel et genere_valide (etablissement_id NULL) :
-        toujours inclus, quel que soit le demandeur — portée plateforme
+        inclus si le pays correspond (voir migration 009 — évite qu'un
+        programme camerounais influence une génération au Sénégal)
       - notes_cours de l'établissement du demandeur : seulement si le
         demandeur en est l'auteur, OU si le document a été explicitement
         partagé avec lui (table documents_partages)
@@ -190,7 +196,7 @@ def rechercher_passages_pertinents(cur, requete_embedding: list[float],
           AND (%s::uuid IS NULL OR d.niveau_id = %s::uuid)
           AND (%s::uuid IS NULL OR d.matiere_id = %s::uuid)
           AND (
-                d.etablissement_id IS NULL
+                (d.etablissement_id IS NULL AND (%s::text IS NULL OR d.pays = %s::text))
                 OR (
                     d.etablissement_id = %s::uuid
                     AND d.type_document = 'notes_cours'
@@ -207,6 +213,7 @@ def rechercher_passages_pertinents(cur, requete_embedding: list[float],
         LIMIT %s
         """,
         (niveau_id, niveau_id, matiere_id, matiere_id,
+         pays, pays,
          etablissement_id, utilisateur_id_demandeur, utilisateur_id_demandeur,
          vers_pgvector(requete_embedding), k),
     )

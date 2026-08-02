@@ -38,11 +38,11 @@ async def deposer_notes_cours(
         cur.execute(
             """
             INSERT INTO documents_pedagogiques
-                (etablissement_id, depose_par_id, type_document, niveau_id, matiere_id, titre, statut)
-            VALUES (%s, %s, 'notes_cours', %s, %s, %s, 'en_traitement')
+                (etablissement_id, depose_par_id, type_document, niveau_id, matiere_id, titre, pays, statut)
+            VALUES (%s, %s, 'notes_cours', %s, %s, %s, %s, 'en_traitement')
             RETURNING id
             """,
-            (enseignant.etablissement_id, enseignant.id, niveau_id, matiere_id, titre),
+            (enseignant.etablissement_id, enseignant.id, niveau_id, matiere_id, titre, enseignant.pays),
         )
         document_id = cur.fetchone()[0]
 
