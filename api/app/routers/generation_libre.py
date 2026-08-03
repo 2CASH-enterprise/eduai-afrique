@@ -7,6 +7,7 @@ from ..db import get_cursor
 from ..deps import get_enseignant_connecte
 from ..generation_libre import generer_exercice_a_la_demande
 from ..schemas import DemandeGenerationLibre, ExerciceGenereLibre, EnseignantConnecte, MatiereResume
+from ..text_utils import aplatir_en_texte
 
 router = APIRouter(prefix="/enseignant", tags=["generation-libre"])
 
@@ -94,12 +95,29 @@ def generer_en_mode_libre(payload: DemandeGenerationLibre, enseignant: Enseignan
     donnees = generer_exercice_a_la_demande(matiere=row_matiere[0], niveau=payload.niveau, theme=payload.theme,
                                               passages_contexte=passages)
 
+    # Filet de sécurité : rien ne garantit que l'IA renvoie exactement des
+    # chaînes là où le schéma en attend (incident du 03/08 — "corrige" et
+    # "etapes" reçus comme des objets/listes d'objets, provoquant une
+    # ValidationError Pydantic non rattrapée, donc un 500 côté navigateur).
+    def _str(valeur):
+        return aplatir_en_texte(valeur) if valeur is not None and not isinstance(valeur, str) else valeur
+
+    etapes_brutes = donnees.get("etapes", []) or []
+    if not isinstance(etapes_brutes, list):
+        etapes_brutes = [etapes_brutes]
+    etapes = [aplatir_en_texte(e) if not isinstance(e, str) else e for e in etapes_brutes]
+
+    tags_bruts = donnees.get("tags", []) or []
+    if not isinstance(tags_bruts, list):
+        tags_bruts = [tags_bruts]
+    tags = [aplatir_en_texte(t) if not isinstance(t, str) else t for t in tags_bruts]
+
     return ExerciceGenereLibre(
         theme=payload.theme,
-        sous_theme=donnees.get("sous_theme"),
-        enonce=donnees.get("enonce", ""),
-        corrige=donnees.get("corrige", ""),
-        etapes=donnees.get("etapes", []),
-        contexte=donnees.get("contexte"),
-        tags=donnees.get("tags", []),
+        sous_theme=_str(donnees.get("sous_theme")),
+        enonce=_str(donnees.get("enonce", "")) or "",
+        corrige=_str(donnees.get("corrige", "")) or "",
+        etapes=etapes,
+        contexte=_str(donnees.get("contexte")),
+        tags=tags,
     )

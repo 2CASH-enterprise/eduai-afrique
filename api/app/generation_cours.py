@@ -23,6 +23,7 @@ from mistralai.client import Mistral
 
 from . import rag
 from .db import get_cursor
+from .text_utils import aplatir_en_texte
 
 MODELE = "mistral-small-latest"
 
@@ -115,29 +116,6 @@ def _structure_valide(type_ressource: str, donnees) -> bool:
     return False
 
 
-def _aplatir_en_texte(valeur, niveau: int = 0) -> str:
-    """Convertit n'importe quelle valeur JSON en texte lisible — utilisé
-    uniquement en repli, quand la structure attendue n'est pas respectée."""
-    prefixe = "  " * niveau
-    if isinstance(valeur, str):
-        return valeur
-    if isinstance(valeur, (int, float, bool)) or valeur is None:
-        return str(valeur)
-    if isinstance(valeur, list):
-        return "\n".join(f"{prefixe}- {_aplatir_en_texte(v, niveau + 1)}" for v in valeur)
-    if isinstance(valeur, dict):
-        lignes = []
-        for cle, sous_valeur in valeur.items():
-            libelle = str(cle).replace("_", " ").capitalize()
-            sous_texte = _aplatir_en_texte(sous_valeur, niveau + 1)
-            if "\n" in sous_texte:
-                lignes.append(f"{prefixe}{libelle} :\n{sous_texte}")
-            else:
-                lignes.append(f"{prefixe}{libelle} : {sous_texte}")
-        return "\n".join(lignes)
-    return str(valeur)
-
-
 
 def _rechercher_contexte(matiere_nom: str, niveau_nom: str, titre_cours: str,
                           niveau_id: str | None, matiere_id: str | None,
@@ -209,6 +187,6 @@ def generer_ressource(type_ressource: str, titre_cours: str, contenu_texte: str 
         # exemple explicite) — on aplatit tout ce qu'elle a renvoyé plutôt
         # que de stocker une structure que le frontend ne saurait pas
         # afficher, ou de perdre le contenu généré.
-        return {"texte": _aplatir_en_texte(donnees)}
+        return {"texte": aplatir_en_texte(donnees)}
     except Exception as e:
         return {"texte": f"[Erreur de génération : {e}] {titre_cours}"}
