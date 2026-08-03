@@ -360,7 +360,7 @@ function BarreNav({ vue, setVue, onDeconnexion, nombreEnAttente, nombreInvitatio
     { id: "mes-credits", label: "Mes crédits" },
     { id: "invitations", label: "Invitations", badge: nombreInvitations },
     { id: "file", label: "À valider", badge: nombreEnAttente },
-    { id: "historique", label: "Historique" },
+    { id: "historique", label: "Historique de validation" },
   ];
   return (
     <div
@@ -1654,10 +1654,11 @@ function EcranHistorique({ token }) {
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
       <h1 className="eduai-display text-3xl mb-2 flex items-center gap-2" style={{ color: C.encre }}>
-        <History size={24} /> Historique
+        <History size={24} /> Historique de validation
       </h1>
       <p className="text-xs mb-8" style={{ color: C.encreAttenue }}>
-        Toutes vos décisions de validation sur la bibliothèque commune, quelle que soit la session.
+        Vos décisions sur la bibliothèque commune ("À valider"), quelle que soit la session. Les exercices générés
+        via "Génération libre" ont leur propre historique, visible directement sur cette page-là.
       </p>
       <BandeauErreur message={erreur} />
       {chargement ? <Chargement /> : historique.length === 0 ? (
