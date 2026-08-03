@@ -21,6 +21,10 @@ def _system_prompt(pays: str | None) -> str:
     return (
         f"Tu es un expert en pédagogie pour {pays_texte}. Tu génères des "
         f"exercices scolaires conformes aux programmes officiels de {pays_texte}. "
+        "Rédige TOUJOURS en français (consignes, énoncé, corrigé) — y compris pour "
+        "les exercices de langue étrangère (anglais, allemand, espagnol...), où seuls "
+        "les mots ou phrases dans la langue étudiée doivent apparaître dans cette langue, "
+        "jamais les consignes ni les explications. "
         "Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après, "
         "sans balises markdown. Le JSON doit avoir exactement ces clés : "
         "sous_theme, enonce, corrige, etapes (liste), contexte, tags (liste de 2-4 mots-clés)."

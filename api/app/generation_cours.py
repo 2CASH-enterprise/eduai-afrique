@@ -147,6 +147,9 @@ def generer_ressource(type_ressource: str, titre_cours: str, contenu_texte: str 
     pays_texte = pays or "le pays de l'enseignant"
     system_prompt = (
         f"Tu es un expert en pédagogie pour {pays_texte}, qui aide un enseignant à préparer sa classe. "
+        "Rédige TOUJOURS en français — y compris pour les cours de langue étrangère (anglais, allemand, "
+        "espagnol...), où seuls les mots ou phrases dans la langue étudiée doivent apparaître dans cette "
+        "langue, jamais les consignes ni les explications. "
         "Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après, sans balises markdown. "
         f"Respecte EXACTEMENT cette structure (mêmes clés, mêmes types — remplace juste le contenu "
         f"d'exemple par du vrai contenu pédagogique) :\n{schema_exemple}"
