@@ -1922,42 +1922,130 @@ function EcranMesDocuments({ token, classes }) {
 /*  Écran : Génération libre (sans classe, sans établissement)         */
 /* ------------------------------------------------------------------ */
 
+function CarteExerciceGenereLibre({ exercice, onStatutChange }) {
+  const [ouvertCorrige, setOuvertCorrige] = useState(false);
+  const [enCours, setEnCours] = useState(false);
+
+  async function changerStatut(nouveauStatut) {
+    setEnCours(true);
+    try { await onStatutChange(exercice.id, nouveauStatut); }
+    finally { setEnCours(false); }
+  }
+
+  const badge = {
+    en_attente: { label: "À relire", bg: C.ambreFond, fg: C.ambre },
+    valide: { label: "Validé", bg: C.vertFond, fg: C.vert },
+    rejete: { label: "Rejeté", bg: C.rougeFond, fg: C.rouge },
+  }[exercice.statut];
+
+  return (
+    <div className="rounded-xl p-5 border eduai-fade-in" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <h3 className="eduai-display text-base" style={{ color: C.encre }}>{exercice.theme}</h3>
+          {exercice.sous_theme && <p className="text-xs" style={{ color: C.encreAttenue }}>{exercice.sous_theme}</p>}
+        </div>
+        <span className="eduai-mono text-[10px] px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: badge.bg, color: badge.fg }}>{badge.label}</span>
+      </div>
+
+      <p className="text-sm font-semibold mb-1 mt-3" style={{ color: C.encre }}>Énoncé</p>
+      <p className="text-sm mb-3 whitespace-pre-wrap" style={{ color: C.encreDoux }}>{exercice.enonce}</p>
+
+      <button onClick={() => setOuvertCorrige((o) => !o)} className="eduai-focus flex items-center gap-1 text-xs font-medium mb-3" style={{ color: C.accentFonce }}>
+        <ChevronDown size={12} style={{ transform: ouvertCorrige ? "rotate(180deg)" : "none", transition: "transform 150ms" }} />
+        {ouvertCorrige ? "Masquer le corrigé" : "Voir le corrigé"}
+      </button>
+      {ouvertCorrige && (
+        <div className="pt-2 border-t mb-3" style={{ borderColor: C.ligne }}>
+          <p className="text-sm whitespace-pre-wrap mb-2" style={{ color: C.encreDoux }}>{exercice.corrige}</p>
+          {exercice.etapes?.length > 0 && (
+            <ul className="list-disc list-inside text-sm space-y-0.5" style={{ color: C.encreDoux }}>
+              {exercice.etapes.map((et, i) => <li key={i}>{et}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {exercice.tags?.length > 0 && (
+        <div className="flex gap-1.5 flex-wrap mb-3">
+          {exercice.tags.map((t) => <span key={t} className="rounded-full px-2 py-0.5 text-[11px]" style={{ backgroundColor: C.bleuFond, color: C.encre }}>{t}</span>)}
+        </div>
+      )}
+
+      {exercice.statut === "en_attente" && (
+        <div className="flex gap-2 pt-1">
+          <button onClick={() => changerStatut("valide")} disabled={enCours}
+            className="eduai-focus flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-60" style={{ backgroundColor: C.vertFond, color: C.vert }}>
+            <Check size={12} /> Valider
+          </button>
+          <button onClick={() => changerStatut("rejete")} disabled={enCours}
+            className="eduai-focus flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-60" style={{ backgroundColor: C.rougeFond, color: C.rouge }}>
+            <XIcon size={12} /> Rejeter
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EcranGenerationLibre({ token }) {
   const [matieres, setMatieres] = useState([]);
   const [matiereId, setMatiereId] = useState("");
   const [niveau, setNiveau] = useState("");
   const [theme, setTheme] = useState("");
-  const [genere, setGenere] = useState(null);
+  const [quantite, setQuantite] = useState(3);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState(null);
+
+  const [historique, setHistorique] = useState([]);
+  const [chargementHistorique, setChargementHistorique] = useState(true);
 
   useEffect(() => {
     apiFetch("/enseignant/matieres", { token }).then((m) => { setMatieres(m); if (m[0]) setMatiereId(m[0].id); }).catch(() => {});
   }, [token]);
 
+  const chargerHistorique = useCallback(() => {
+    setChargementHistorique(true);
+    apiFetch("/enseignant/generation-libre", { token }).then(setHistorique).catch(() => {}).finally(() => setChargementHistorique(false));
+  }, [token]);
+
+  useEffect(() => { chargerHistorique(); }, [chargerHistorique]);
+
   async function generer(e) {
     e.preventDefault();
-    setEnCours(true); setErreur(null); setGenere(null);
+    setEnCours(true); setErreur(null);
     try {
-      const resultat = await apiFetch("/enseignant/generation-libre", {
-        method: "POST", token, body: { matiere_id: matiereId, niveau, theme },
+      await apiFetch("/enseignant/generation-libre", {
+        method: "POST", token, body: { matiere_id: matiereId, niveau, theme, quantite: Number(quantite) },
       });
-      setGenere(resultat);
+      setTheme("");
+      chargerHistorique();
     } catch (e) { setErreur(e.message); }
     finally { setEnCours(false); }
   }
+
+  async function changerStatut(exerciceId, statut) {
+    try {
+      await apiFetch(`/enseignant/generation-libre/${exerciceId}`, { method: "PATCH", token, body: { statut } });
+      chargerHistorique();
+    } catch (e) { setErreur(e.message); }
+  }
+
+  const enAttente = historique.filter((e) => e.statut === "en_attente");
+  const traites = historique.filter((e) => e.statut !== "en_attente");
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
       <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Génération libre</h1>
       <p className="text-sm mb-8" style={{ color: C.encreDoux }}>
-        Génère un exercice sur le niveau et le thème de ton choix, sans dépendre d'une classe réelle — utile pour explorer un thème
-        ou préparer du contenu en tant qu'enseignant indépendant. Le résultat n'est ni sauvegardé ni relu par un collègue : à vérifier avant usage.
+        Génère une série d'exercices corrigés sur le niveau et le thème de ton choix — utile pour préparer du contenu sur
+        plusieurs classes que tu enseignes, sans dépendre d'une classe déclarée. Une fois validés, ils enrichissent
+        silencieusement le corpus utilisé par l'IA. Toujours gratuit, quel que soit ton solde de crédits.
       </p>
 
       <BandeauErreur message={erreur} />
 
-      <form onSubmit={generer} className="rounded-2xl p-6 border space-y-3 mb-6" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+      <form onSubmit={generer} className="rounded-2xl p-6 border space-y-3 mb-8" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
         <div className="grid grid-cols-2 gap-3">
           <select value={matiereId} onChange={(e) => setMatiereId(e.target.value)} required
             className="eduai-focus rounded-lg px-3 py-2.5 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}>
@@ -1968,39 +2056,43 @@ function EcranGenerationLibre({ token }) {
         </div>
         <input required value={theme} onChange={(e) => setTheme(e.target.value)} placeholder="Thème (ex : les suites numériques)"
           className="eduai-focus w-full rounded-lg px-3 py-2.5 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
+        <label className="flex items-center gap-3">
+          <span className="text-xs font-medium" style={{ color: C.encreDoux }}>Nombre d'exercices</span>
+          <select value={quantite} onChange={(e) => setQuantite(e.target.value)}
+            className="eduai-focus rounded-lg px-3 py-1.5 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}>
+            {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
         <button type="submit" disabled={enCours}
           className="eduai-focus flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
           {enCours ? <Loader2 size={14} className="eduai-spin" /> : <Wand2 size={14} />} Générer
         </button>
       </form>
 
-      {genere && (
-        <div className="rounded-2xl p-6 border eduai-fade-in" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
-          <div className="rounded-lg px-3 py-2 mb-4 text-xs flex items-start gap-2" style={{ backgroundColor: C.ambreFond, color: C.ambre }}>
-            <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" /> {genere.avertissement}
-          </div>
-          <h2 className="eduai-display text-lg mb-1" style={{ color: C.encre }}>{genere.theme}</h2>
-          {genere.sous_theme && <p className="text-xs mb-4" style={{ color: C.encreAttenue }}>{genere.sous_theme}</p>}
-          <p className="text-sm font-semibold mb-1" style={{ color: C.encre }}>Énoncé</p>
-          <p className="text-sm mb-4 whitespace-pre-wrap" style={{ color: C.encreDoux }}>{genere.enonce}</p>
-          <p className="text-sm font-semibold mb-1" style={{ color: C.encre }}>Corrigé</p>
-          <p className="text-sm mb-4 whitespace-pre-wrap" style={{ color: C.encreDoux }}>{genere.corrige}</p>
-          {genere.etapes?.length > 0 && (
-            <>
-              <p className="text-sm font-semibold mb-1" style={{ color: C.encre }}>Étapes</p>
-              <ul className="list-disc list-inside text-sm mb-4 space-y-0.5" style={{ color: C.encreDoux }}>
-                {genere.etapes.map((et, i) => <li key={i}>{et}</li>)}
-              </ul>
-            </>
-          )}
-          {genere.tags?.length > 0 && (
-            <div className="flex gap-1.5 flex-wrap">
-              {genere.tags.map((t) => (
-                <span key={t} className="rounded-full px-2 py-0.5 text-[11px]" style={{ backgroundColor: C.bleuFond, color: C.encre }}>{t}</span>
-              ))}
+      {chargementHistorique ? <Chargement /> : (
+        <>
+          {enAttente.length > 0 && (
+            <div className="mb-8">
+              <h2 className="eduai-display text-lg mb-3" style={{ color: C.encre }}>À relire ({enAttente.length})</h2>
+              <div className="space-y-4">
+                {enAttente.map((ex) => <CarteExerciceGenereLibre key={ex.id} exercice={ex} onStatutChange={changerStatut} />)}
+              </div>
             </div>
           )}
-        </div>
+
+          {traites.length > 0 && (
+            <div>
+              <h2 className="eduai-display text-lg mb-3" style={{ color: C.encre }}>Historique</h2>
+              <div className="space-y-4">
+                {traites.map((ex) => <CarteExerciceGenereLibre key={ex.id} exercice={ex} onStatutChange={changerStatut} />)}
+              </div>
+            </div>
+          )}
+
+          {historique.length === 0 && (
+            <p className="text-sm text-center py-6" style={{ color: C.encreAttenue }}>Aucun exercice généré pour l'instant.</p>
+          )}
+        </>
       )}
     </div>
   );

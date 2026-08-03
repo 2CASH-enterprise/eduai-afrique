@@ -258,6 +258,36 @@ de formule (upgrade/downgrade — qui déclenche ça, l'Admin Plateforme ?).
 
 ---
 
+## 15. Génération libre redéfinie en poste d'exercices persistants — ✅ FAIT le 03/08
+
+**Discuté et cadré le 03/08** : l'ancienne Génération libre (un exercice à
+la fois, jamais sauvegardé, jamais validable, sans effet sur le corpus)
+ne correspondait plus au besoin réel — un enseignant qui enseigne
+plusieurs classes (Terminale et 5ème par exemple) doit pouvoir produire de
+vrais exercices réutilisables, pas juste explorer un thème ponctuellement.
+
+**Nouveau fonctionnement** :
+- L'enseignant choisit niveau (texte libre), matière, thème, et une
+  **quantité au choix (1 à 5)**.
+- Génère une **série** d'exercices corrigés d'un coup, chacun persisté
+  avec un statut `en_attente`.
+- Chaque exercice se **valide ou se rejette** individuellement — comme les
+  ressources de "Déposer un cours".
+- Une fois validé, l'exercice **reste dans le système** (historique
+  consultable) et **réinjecte silencieusement le corpus documentaire**
+  (Type 3), rattaché au bon pays.
+- **Reste gratuite, sans condition** — contrairement à "Déposer un cours",
+  jamais concernée par le système de crédits (décision explicite du 03/08).
+
+**Construit et déployé** : nouvelle table `exercices_generation_libre`
+(distincte de `exercices`, qui sert la bibliothèque commune et exige un
+vrai `niveau_id` — même logique que `classes_personnelles` vs `classes`),
+endpoints `POST` (génère la série), `GET` (historique), `PATCH` (valide/
+rejette), écran refondu avec sélecteur de quantité, cartes "à relire" et
+historique.
+
+---
+
 ## 14. Segmentation du corpus documentaire par pays — ✅ FAIT le 02/08
 
 **Découvert en préparant le dépôt des programmes officiels de Côte

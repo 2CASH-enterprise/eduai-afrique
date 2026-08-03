@@ -557,6 +557,32 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
     GRANT USAGE, SELECT ON SEQUENCES TO eduai_app;
 
 -- ============================================================================
+-- ============================================================================
+-- Génération libre — persistante depuis le 03/08 (voir migration 011)
+-- ============================================================================
+-- Séparée de `exercices` (bibliothèque commune + pipeline hors-ligne, qui
+-- exige un niveau_id réel) : ici niveau reste en texte libre, comme pour
+-- classes_personnelles. Toujours gratuite, jamais concernée par les crédits.
+CREATE TABLE exercices_generation_libre (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    enseignant_id       UUID NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+    matiere_id          UUID NOT NULL REFERENCES matieres(id),
+    niveau              TEXT NOT NULL,
+    theme               TEXT NOT NULL,
+    pays                TEXT NOT NULL,
+    sous_theme          TEXT,
+    enonce              TEXT NOT NULL,
+    corrige             TEXT NOT NULL,
+    etapes              TEXT[],
+    contexte            TEXT,
+    tags                TEXT[] DEFAULT '{}',
+    statut              TEXT NOT NULL DEFAULT 'en_attente'
+                        CHECK (statut IN ('en_attente', 'valide', 'rejete')),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_exgl_enseignant ON exercices_generation_libre(enseignant_id);
+CREATE INDEX idx_exgl_statut ON exercices_generation_libre(statut);
+
 -- Système de crédits enseignant (voir migration 008 pour la logique complète)
 -- ============================================================================
 CREATE TABLE credits_enseignant (

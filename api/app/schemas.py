@@ -688,14 +688,23 @@ class DemandeGenerationLibre(BaseModel):
     # l'incident du 31/07 sur ce même sujet (Collège Vogt, TODO.md point 3).
     matiere_id: str
     theme: str
+    quantite: int = 3  # 1 à 5, validé côté endpoint — combien d'exercices générer d'un coup
 
 
 class ExerciceGenereLibre(BaseModel):
+    id: str
     theme: str
     sous_theme: str | None
+    niveau: str
+    matiere: str
     enonce: str
     corrige: str
     etapes: list[str]
     contexte: str | None
     tags: list[str]
-    avertissement: str = "Contenu généré par IA, non relu par un humain — à vérifier avant toute utilisation en classe."
+    statut: str
+    created_at: datetime
+
+
+class ModificationExerciceGenereLibre(BaseModel):
+    statut: str  # 'valide' | 'rejete'
