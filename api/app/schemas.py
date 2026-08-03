@@ -577,6 +577,16 @@ class ExerciceValide(BaseModel):
     date_validation: datetime
 
 
+class HistoriqueValidationExercice(BaseModel):
+    id: str
+    theme: str
+    matiere: str
+    niveau: str
+    statut: str
+    motif: str | None
+    date_validation: datetime
+
+
 # ---------------------------------------------------------------------------
 # Admin Plateforme
 # ---------------------------------------------------------------------------

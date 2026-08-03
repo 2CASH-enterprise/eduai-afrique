@@ -258,6 +258,23 @@ de formule (upgrade/downgrade — qui déclenche ça, l'Admin Plateforme ?).
 
 ---
 
+## 16. Historique des validations d'exercices rendu persistant — ✅ FAIT le 03/08
+
+**Découvert en lisant une note laissée dans le code** ("Un vrai historique
+persistant nécessiterait un endpoint dédié côté API") : l'onglet
+"Historique" de l'espace Enseignant n'accumulait les décisions de
+validation/rejet (bibliothèque commune) qu'en mémoire navigateur, le
+temps de la session — tout redevenait vide après un rechargement de page
+ou une reconnexion, alors que les exercices restaient bien à jour en base.
+
+**Construit** : `GET /enseignant/exercices/mon-historique`, qui relit
+`exercices` filtré par `valide_par_id` (réutilisé pour valider ET rejeter,
+malgré son nom) et `statut IN ('valide','rejete')`, avec le motif de rejet
+extrait du champ `liens`. Le frontend charge désormais cet historique
+depuis l'API à l'ouverture de l'onglet, au lieu de se fier à l'état local.
+
+---
+
 ## 15. Génération libre redéfinie en poste d'exercices persistants — ✅ FAIT le 03/08
 
 **Discuté et cadré le 03/08** : l'ancienne Génération libre (un exercice à

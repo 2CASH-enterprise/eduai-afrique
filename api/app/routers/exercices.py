@@ -4,7 +4,7 @@ from .. import rag
 from ..db import get_cursor
 from ..deps import get_enseignant_connecte
 from ..schemas import (ExerciceEnAttente, ModificationExercice, RejetExercice,
-                        ExerciceValide, EnseignantConnecte)
+                        ExerciceValide, EnseignantConnecte, HistoriqueValidationExercice)
 
 router = APIRouter(prefix="/enseignant/exercices", tags=["exercices"])
 
@@ -207,3 +207,31 @@ def rejeter_exercice(
 
     return ExerciceValide(id=str(resultat[0]), statut=resultat[1],
                            valide_par_id=str(resultat[2]), date_validation=resultat[3])
+
+
+@router.get("/mon-historique", response_model=list[HistoriqueValidationExercice])
+def mon_historique(enseignant: EnseignantConnecte = Depends(get_enseignant_connecte)):
+    """Historique PERSISTANT des décisions de validation de cet enseignant
+    (bibliothèque commune) — contrairement à l'ancien onglet Historique du
+    frontend, qui n'accumulait qu'en mémoire navigateur le temps de la
+    session (note laissée dans le code, corrigée le 03/08). `valide_par_id`
+    sert pour les deux cas (validation ET rejet, malgré son nom) ; le motif
+    de rejet est stocké dans le champ `liens` JSONB."""
+    with get_cursor() as cur:
+        cur.execute(
+            """
+            SELECT e.id, e.theme, m.nom, n.nom, e.statut, e.liens->>'motif_rejet', e.date_validation
+            FROM exercices e
+            JOIN matieres m ON m.id = e.matiere_id
+            JOIN niveaux n ON n.id = e.niveau_id
+            WHERE e.valide_par_id = %s AND e.statut IN ('valide', 'rejete')
+            ORDER BY e.date_validation DESC
+            """,
+            (enseignant.id,),
+        )
+        lignes = cur.fetchall()
+    return [
+        HistoriqueValidationExercice(id=str(id_), theme=theme, matiere=matiere, niveau=niveau,
+                                       statut=statut, motif=motif, date_validation=date_validation)
+        for id_, theme, matiere, niveau, statut, motif, date_validation in lignes
+    ]

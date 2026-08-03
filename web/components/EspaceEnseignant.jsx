@@ -1640,21 +1640,32 @@ function EcranExerciceDetail({ exerciceId, enAttente, token, setVue, onValider, 
 /*  Écran : Historique (accumulé côté client — voir note en bas)       */
 /* ------------------------------------------------------------------ */
 
-function EcranHistorique({ historique }) {
+function EcranHistorique({ token }) {
+  const [historique, setHistorique] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+
+  useEffect(() => {
+    setChargement(true);
+    apiFetch("/enseignant/exercices/mon-historique", { token })
+      .then(setHistorique).catch((e) => setErreur(e.message)).finally(() => setChargement(false));
+  }, [token]);
+
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
       <h1 className="eduai-display text-3xl mb-2 flex items-center gap-2" style={{ color: C.encre }}>
         <History size={24} /> Historique
       </h1>
       <p className="text-xs mb-8" style={{ color: C.encreAttenue }}>
-        Décisions de cette session. Un vrai historique persistant nécessiterait un endpoint dédié côté API (pas encore construit).
+        Toutes vos décisions de validation sur la bibliothèque commune, quelle que soit la session.
       </p>
-      {historique.length === 0 ? (
-        <p className="text-sm" style={{ color: C.encreDoux }}>Aucune décision enregistrée pour l'instant dans cette session.</p>
+      <BandeauErreur message={erreur} />
+      {chargement ? <Chargement /> : historique.length === 0 ? (
+        <p className="text-sm" style={{ color: C.encreDoux }}>Aucune décision enregistrée pour l'instant.</p>
       ) : (
         <div className="space-y-3">
-          {historique.map((h, i) => (
-            <div key={i} className="rounded-xl p-5 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+          {historique.map((h) => (
+            <div key={h.id} className="rounded-xl p-5 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
               <div className="flex items-center justify-between mb-1.5">
                 <p className="text-sm font-semibold" style={{ color: C.encre }}>{h.theme}</p>
                 <span className="eduai-mono text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1" style={{ backgroundColor: h.statut === "valide" ? C.vertFond : C.rougeFond, color: h.statut === "valide" ? C.vert : C.rouge }}>
@@ -2353,7 +2364,7 @@ export default function App() {
           {vue === "file" && <EcranFile enAttente={enAttente} chargement={chargementFile} erreur={erreurFile} setExerciceActifId={setExerciceActifId} setVue={setVue} filtre={filtre} setFiltre={setFiltre} />}
           {vue === "exercice-detail" && exerciceActifId && <EcranExerciceDetail exerciceId={exerciceActifId} enAttente={enAttente} token={token} setVue={setVue} onValider={onValider} onRejeter={onRejeter} />}
 
-          {vue === "historique" && <EcranHistorique historique={historique} />}
+          {vue === "historique" && <EcranHistorique token={token} />}
         </>
       )}
     </div>
