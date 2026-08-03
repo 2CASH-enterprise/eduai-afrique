@@ -144,8 +144,9 @@ def generer_ressource(type_ressource: str, titre_cours: str, contenu_texte: str 
                                       niveau_id, matiere_id, etablissement_id, enseignant_id, pays)
 
     schema_exemple = json.dumps(SCHEMAS_PAR_TYPE[type_ressource], ensure_ascii=False, indent=2)
+    pays_texte = pays or "le pays de l'enseignant"
     system_prompt = (
-        "Tu es un expert en pédagogie pour le Cameroun, qui aide un enseignant à préparer sa classe. "
+        f"Tu es un expert en pédagogie pour {pays_texte}, qui aide un enseignant à préparer sa classe. "
         "Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après, sans balises markdown. "
         f"Respecte EXACTEMENT cette structure (mêmes clés, mêmes types — remplace juste le contenu "
         f"d'exemple par du vrai contenu pédagogique) :\n{schema_exemple}"

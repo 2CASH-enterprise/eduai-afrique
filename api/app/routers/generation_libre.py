@@ -74,12 +74,13 @@ def lister_matieres(enseignant: EnseignantConnecte = Depends(get_enseignant_conn
     return [MatiereResume(id=str(id_), nom=nom) for id_, nom in lignes]
 
 
-def _generer_un_exercice_normalise(matiere_nom: str, niveau: str, theme: str, passages: list[str], indice: int) -> dict:
+def _generer_un_exercice_normalise(matiere_nom: str, niveau: str, theme: str, passages: list[str], indice: int, pays: str | None) -> dict:
     """Appelle l'IA puis aplatit défensivement chaque champ vers son type
     attendu — rien ne garantit qu'elle renvoie exactement des chaînes
     simples (incidents des 02/08 et 03/08)."""
     theme_varie = theme if indice == 0 else f"{theme} (variante {indice + 1}, différente des précédentes)"
-    donnees = generer_exercice_a_la_demande(matiere=matiere_nom, niveau=niveau, theme=theme_varie, passages_contexte=passages)
+    donnees = generer_exercice_a_la_demande(matiere=matiere_nom, niveau=niveau, theme=theme_varie,
+                                              passages_contexte=passages, pays=pays)
 
     def _str(valeur):
         return aplatir_en_texte(valeur) if valeur is not None and not isinstance(valeur, str) else valeur
@@ -129,7 +130,7 @@ def generer_en_mode_libre(payload: DemandeGenerationLibre, enseignant: Enseignan
     resultats = []
     with get_cursor(commit=True) as cur:
         for i in range(payload.quantite):
-            donnees = _generer_un_exercice_normalise(matiere_nom, payload.niveau, payload.theme, passages, i)
+            donnees = _generer_un_exercice_normalise(matiere_nom, payload.niveau, payload.theme, passages, i, enseignant.pays)
             cur.execute(
                 """
                 INSERT INTO exercices_generation_libre

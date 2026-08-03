@@ -16,34 +16,45 @@ from mistralai.client import Mistral
 
 MODELE = "mistral-small-latest"
 
-SYSTEM_PROMPT = """Tu es un expert en pédagogie pour le Cameroun. Tu génères des \
-exercices scolaires conformes aux programmes officiels camerounais. \
-Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après, \
-sans balises markdown. Le JSON doit avoir exactement ces clés : \
-sous_theme, enonce, corrige, etapes (liste), contexte, tags (liste de 2-4 mots-clés)."""
+def _system_prompt(pays: str | None) -> str:
+    pays_texte = pays or "le pays de l'enseignant"
+    return (
+        f"Tu es un expert en pédagogie pour {pays_texte}. Tu génères des "
+        f"exercices scolaires conformes aux programmes officiels de {pays_texte}. "
+        "Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après, "
+        "sans balises markdown. Le JSON doit avoir exactement ces clés : "
+        "sous_theme, enonce, corrige, etapes (liste), contexte, tags (liste de 2-4 mots-clés)."
+    )
 
 
-def _construire_prompt(matiere: str, niveau: str, theme: str) -> str:
+def _construire_prompt(matiere: str, niveau: str, theme: str, pays: str | None) -> str:
+    pays_texte = pays or "le pays de l'enseignant"
     return f"""Génère UN exercice de {matiere} pour la classe de {niveau}, \
 sur le thème "{theme}".
 
 Contraintes :
-1. Conforme au programme officiel camerounais.
+1. Conforme au programme officiel de {pays_texte}.
 2. Énoncé clair, corrigé détaillé avec étapes de raisonnement.
 3. Utilise si possible un contexte local (agriculture, marché, vie \
-quotidienne au Cameroun) — sans le forcer si le thème ne s'y prête pas."""
+quotidienne en {pays_texte}) — sans le forcer si le thème ne s'y prête pas."""
 
 
-def generer_exercice_a_la_demande(matiere: str, niveau: str, theme: str, passages_contexte: list[str] | None = None) -> dict:
+def generer_exercice_a_la_demande(matiere: str, niveau: str, theme: str, passages_contexte: list[str] | None = None,
+                                    pays: str | None = None) -> dict:
     """Appelle Mistral directement et retourne le JSON parsé. Lève une
     HTTPException explicite en cas d'échec — contrairement au pipeline par
     lot, ici il y a un utilisateur en attente d'une réponse immédiate, donc
-    pas de sens à avaler l'erreur silencieusement."""
+    pas de sens à avaler l'erreur silencieusement.
+
+    Le pays est désormais un paramètre explicite (corrigé le 03/08) — avant
+    ça, le prompt mentionnait le Cameroun en dur, quel que soit le pays réel
+    de l'enseignant, ce qui produisait du contenu incohérent (ex : un
+    enseignant ivoirien recevait des exercices parlant du Cameroun)."""
     api_key = os.environ.get("MISTRAL_API_KEY")
     if not api_key:
         raise HTTPException(status_code=503, detail="MISTRAL_API_KEY absente sur le serveur")
 
-    prompt = _construire_prompt(matiere, niveau, theme)
+    prompt = _construire_prompt(matiere, niveau, theme, pays)
     if passages_contexte:
         prompt += (
             "\n\nExtraits de référence disponibles (programme officiel et/ou notes de cours) — "
@@ -55,7 +66,7 @@ def generer_exercice_a_la_demande(matiere: str, niveau: str, theme: str, passage
         reponse = client.chat.complete(
             model=MODELE,
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": _system_prompt(pays)},
                 {"role": "user", "content": prompt},
             ],
             response_format={"type": "json_object"},
