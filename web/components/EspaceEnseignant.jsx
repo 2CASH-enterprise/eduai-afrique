@@ -224,7 +224,10 @@ function ChipMatiere({ label, active, onClick, icon: Icon }) {
 /* ------------------------------------------------------------------ */
 
 const PAYS_DISPONIBLES = [
-  "Cameroun", "Sénégal", "Côte d'Ivoire", "République démocratique du Congo", "Bénin", "Togo", "Gabon",
+  "Bénin", "Burkina Faso", "Burundi", "Cameroun", "Comores", "Côte d'Ivoire",
+  "Djibouti", "Gabon", "Guinée", "Guinée équatoriale", "Madagascar", "Mali", "Niger",
+  "République centrafricaine", "République démocratique du Congo", "République du Congo",
+  "Rwanda", "Sénégal", "Seychelles", "Tchad", "Togo",
 ];
 
 function EcranConnexion({ onConnexion, onInscription, connexionEnCours, erreurConnexion, messageListeAttente }) {

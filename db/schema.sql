@@ -591,6 +591,16 @@ CREATE TABLE pays_couverture (
     actif       BOOLEAN NOT NULL DEFAULT false,
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- 21 pays francophones d'Afrique (voir migrations 012 et 013) — tous
+-- inactifs par défaut, activés explicitement un par un par l'Admin
+-- Plateforme selon l'avancement du corpus documentaire de chacun.
+INSERT INTO pays_couverture (pays, actif) VALUES
+    ('Cameroun', false), ('Sénégal', false), ('Côte d''Ivoire', false),
+    ('République démocratique du Congo', false), ('Bénin', false), ('Togo', false), ('Gabon', false),
+    ('Burkina Faso', false), ('Burundi', false), ('Comores', false), ('République du Congo', false),
+    ('Djibouti', false), ('Guinée', false), ('Guinée équatoriale', false), ('Madagascar', false),
+    ('Mali', false), ('Niger', false), ('Rwanda', false), ('Seychelles', false), ('Tchad', false),
+    ('République centrafricaine', false);
 
 CREATE TABLE liste_attente_inscriptions (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
