@@ -258,6 +258,58 @@ de formule (upgrade/downgrade — qui déclenche ça, l'Admin Plateforme ?).
 
 ---
 
+## 19. Manques identifiés sur le module Enseignant — discuté le 04/08
+
+**Bilan fait le 04/08** avant le lancement en test ouvert. Sept points
+identifiés, quatre retenus pour cette session — **tous les quatre faits et
+déployés** :
+
+1. **Export PDF/Word** — ✅ FAIT (PDF seulement, pas Word). Module
+   `pdf_export.py` (reportlab/Platypus, mise en page automatique par
+   section selon le type de ressource). Deux endpoints : une ressource
+   seule (`GET /enseignant/cours/{id}/ressources/{id}/export-pdf`) ou tout
+   le cours d'un coup (`GET /enseignant/cours/{id}/export-pdf`), plus un
+   export pour un exercice de Génération libre. Bouton dédié sur chaque
+   ressource et sur l'écran de détail du cours.
+2. **Suivi des résultats élèves** — reporté, pas retenu cette session.
+   La boucle génération → distribution → résultats n'est pas fermée :
+   l'enseignant ne voit pas qui a fait quoi ni avec quel taux de réussite.
+3. **Assigner un contenu à une classe avec échéance** — ✅ FAIT. Champ
+   `cours.date_echeance`, réglable au dépôt ou modifiable après coup
+   (`PATCH /enseignant/cours/{id}/echeance`), affiché avec code couleur
+   selon la proximité (rouge si dépassée, ambre si ≤ 7 jours) sur "Mes
+   cours".
+4. **Dupliquer/adapter un cours existant** — ✅ FAIT.
+   `POST /enseignant/cours/{id}/dupliquer` copie titre + contenu + les 6
+   ressources vers une autre classe (ou la même), sans nouvel appel IA —
+   donc **gratuit, aucun débit de crédits**. Chaque ressource copiée
+   repart de `en_attente`, l'occasion d'adapter avant de revalider.
+5. **Onboarding** — reporté, pas retenu cette session. Aucun tutoriel ni
+   guide de prise en main pour un enseignant qui découvre seul la
+   plateforme — pertinent vu le contexte de test ouvert sans accompagnement.
+6. **Tableau de bord personnel** — reporté, pas retenu cette session.
+   Rien ne montre à l'enseignant une synthèse de son activité (cours
+   déposés, exercices validés...), pourrait se relier aux crédits.
+7. **Niveau de difficulté ciblé à la génération** — ✅ FAIT. Champ
+   `difficulte` ('facile'/'moyen'/'difficile') sur `cours` et
+   `exercices_generation_libre`, transmis au prompt IA pour les deux
+   points d'entrée (Déposer un cours, Génération libre), sélecteur dédié
+   dans les deux formulaires.
+
+**Deux bugs de régression trouvés et corrigés au passage** (ni prévus ni
+demandés, découverts en travaillant sur ces points) :
+- La réinjection du corpus documentaire (Type 3) ne fonctionnait plus
+  pour les ressources structurées depuis l'introduction de la présentation
+  dédiée par type (02-03/08) — `donnees.get("texte")` ne trouvait presque
+  jamais rien. Corrigé en aplatissant systématiquement le contenu avant
+  réinjection (`text_utils.aplatir_en_texte`), quelle que soit sa forme.
+- Les en-têtes HTTP de téléchargement PDF plantaient sur les noms de
+  fichiers accentués ("Résumé.pdf") — l'UTF-8 brut n'est pas valide dans
+  un en-tête HTTP classique. Corrigé avec l'encodage RFC 5987
+  (`filename*=UTF-8''...`), repli ASCII pour les navigateurs plus anciens.
+
+---
+
 ## 18. Rwanda — recherche de programmes officiels, bloquée par la langue
 
 **Recherche faite le 04/08** : l'organisme responsable est identifié (REB

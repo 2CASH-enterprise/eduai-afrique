@@ -1,8 +1,13 @@
+import io
+import re
+import urllib.parse
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from .. import rag
 from .. import credits
+from .. import pdf_export
 from ..db import get_cursor
 from ..deps import get_enseignant_connecte
 from ..generation_libre import generer_exercice_a_la_demande
@@ -11,6 +16,14 @@ from ..schemas import (DemandeGenerationLibre, ExerciceGenereLibre, Modification
 from ..text_utils import aplatir_en_texte
 
 router = APIRouter(prefix="/enseignant", tags=["generation-libre"])
+
+
+def _entete_telechargement(nom_fichier: str) -> dict:
+    """Même correctif que cours.py : un nom de fichier accentué plante un
+    en-tête HTTP classique (UTF-8 brut invalide en Latin-1)."""
+    nom_ascii = re.sub(r"[^\x20-\x7E]", "_", nom_fichier)
+    nom_encode = urllib.parse.quote(nom_fichier)
+    return {"Content-Disposition": f"attachment; filename=\"{nom_ascii}\"; filename*=UTF-8''{nom_encode}"}
 
 QUANTITE_MIN, QUANTITE_MAX = 1, 5
 
@@ -74,13 +87,14 @@ def lister_matieres(enseignant: EnseignantConnecte = Depends(get_enseignant_conn
     return [MatiereResume(id=str(id_), nom=nom) for id_, nom in lignes]
 
 
-def _generer_un_exercice_normalise(matiere_nom: str, niveau: str, theme: str, passages: list[str], indice: int, pays: str | None) -> dict:
+def _generer_un_exercice_normalise(matiere_nom: str, niveau: str, theme: str, passages: list[str], indice: int,
+                                     pays: str | None, difficulte: str) -> dict:
     """Appelle l'IA puis aplatit défensivement chaque champ vers son type
     attendu — rien ne garantit qu'elle renvoie exactement des chaînes
     simples (incidents des 02/08 et 03/08)."""
     theme_varie = theme if indice == 0 else f"{theme} (variante {indice + 1}, différente des précédentes)"
     donnees = generer_exercice_a_la_demande(matiere=matiere_nom, niveau=niveau, theme=theme_varie,
-                                              passages_contexte=passages, pays=pays)
+                                              passages_contexte=passages, pays=pays, difficulte=difficulte)
 
     def _str(valeur):
         return aplatir_en_texte(valeur) if valeur is not None and not isinstance(valeur, str) else valeur
@@ -130,24 +144,25 @@ def generer_en_mode_libre(payload: DemandeGenerationLibre, enseignant: Enseignan
     resultats = []
     with get_cursor(commit=True) as cur:
         for i in range(payload.quantite):
-            donnees = _generer_un_exercice_normalise(matiere_nom, payload.niveau, payload.theme, passages, i, enseignant.pays)
+            donnees = _generer_un_exercice_normalise(matiere_nom, payload.niveau, payload.theme, passages, i,
+                                                        enseignant.pays, payload.difficulte)
             cur.execute(
                 """
                 INSERT INTO exercices_generation_libre
-                    (enseignant_id, matiere_id, niveau, theme, pays, sous_theme, enonce, corrige, etapes, contexte, tags, statut)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'en_attente')
+                    (enseignant_id, matiere_id, niveau, theme, pays, sous_theme, enonce, corrige, etapes, contexte, tags, difficulte, statut)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'en_attente')
                 RETURNING id, created_at
                 """,
                 (enseignant.id, payload.matiere_id, payload.niveau, payload.theme, enseignant.pays,
                  donnees["sous_theme"], donnees["enonce"], donnees["corrige"], donnees["etapes"],
-                 donnees["contexte"], donnees["tags"]),
+                 donnees["contexte"], donnees["tags"], payload.difficulte),
             )
             ex_id, created_at = cur.fetchone()
             resultats.append(ExerciceGenereLibre(
                 id=str(ex_id), theme=payload.theme, sous_theme=donnees["sous_theme"],
                 niveau=payload.niveau, matiere=matiere_nom, enonce=donnees["enonce"], corrige=donnees["corrige"],
                 etapes=donnees["etapes"], contexte=donnees["contexte"], tags=donnees["tags"],
-                statut="en_attente", created_at=created_at,
+                difficulte=payload.difficulte, statut="en_attente", created_at=created_at,
             ))
 
     return resultats
@@ -161,7 +176,7 @@ def lister_generations_libres(enseignant: EnseignantConnecte = Depends(get_ensei
         cur.execute(
             """
             SELECT e.id, e.theme, e.sous_theme, e.niveau, m.nom, e.enonce, e.corrige,
-                   e.etapes, e.contexte, e.tags, e.statut, e.created_at
+                   e.etapes, e.contexte, e.tags, e.difficulte, e.statut, e.created_at
             FROM exercices_generation_libre e
             JOIN matieres m ON m.id = e.matiere_id
             WHERE e.enseignant_id = %s
@@ -173,8 +188,8 @@ def lister_generations_libres(enseignant: EnseignantConnecte = Depends(get_ensei
     return [
         ExerciceGenereLibre(id=str(id_), theme=theme, sous_theme=sous_theme, niveau=niveau, matiere=matiere,
                               enonce=enonce, corrige=corrige, etapes=etapes or [], contexte=contexte, tags=tags or [],
-                              statut=statut, created_at=created_at)
-        for id_, theme, sous_theme, niveau, matiere, enonce, corrige, etapes, contexte, tags, statut, created_at in lignes
+                              difficulte=difficulte, statut=statut, created_at=created_at)
+        for id_, theme, sous_theme, niveau, matiere, enonce, corrige, etapes, contexte, tags, difficulte, statut, created_at in lignes
     ]
 
 
@@ -203,3 +218,25 @@ def valider_ou_rejeter(exercice_id: str, payload: ModificationExerciceGenereLibr
     if payload.statut == "valide" and statut_avant != "valide":
         texte = "\n".join(filter(None, [enonce, corrige, "\n".join(etapes or [])]))
         rag.reinjecter_contenu_valide(titre=theme, texte=texte, niveau_id=None, matiere_id=matiere_id, pays=pays)
+
+
+@router.get("/generation-libre/{exercice_id}/export-pdf")
+def exporter_exercice_libre_pdf(exercice_id: str, enseignant: EnseignantConnecte = Depends(get_enseignant_connecte)):
+    """TODO.md point 19.1 — imprimer un exercice de Génération libre."""
+    with get_cursor() as cur:
+        cur.execute(
+            "SELECT e.theme, e.niveau, m.nom, e.enonce, e.corrige, e.etapes, e.difficulte "
+            "FROM exercices_generation_libre e JOIN matieres m ON m.id = e.matiere_id "
+            "WHERE e.id = %s AND e.enseignant_id = %s",
+            (exercice_id, enseignant.id),
+        )
+        row = cur.fetchone()
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exercice introuvable")
+        theme, niveau, matiere, enonce, corrige, etapes, difficulte = row
+
+    contenu = {"exercices": [{"numero": 1, "difficulte": difficulte, "enonce": enonce,
+                                "corrige": corrige + ("\n\nÉtapes :\n- " + "\n- ".join(etapes) if etapes else "")}]}
+    pdf = pdf_export.construire_pdf_ressource(theme, matiere, niveau, "Exercice (Génération libre)", "exercices", contenu)
+    nom_fichier = f"{theme}.pdf".replace("/", "-")
+    return StreamingResponse(io.BytesIO(pdf), media_type="application/pdf", headers=_entete_telechargement(nom_fichier))

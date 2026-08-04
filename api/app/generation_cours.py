@@ -136,10 +136,18 @@ def _rechercher_contexte(matiere_nom: str, niveau_nom: str, titre_cours: str,
         return []
 
 
+LABELS_DIFFICULTE = {
+    "facile": "plutôt facile, accessible, avec des étapes bien guidées",
+    "moyen": "de difficulté moyenne, standard pour ce niveau",
+    "difficile": "exigeant, pour des élèves à l'aise avec la matière",
+}
+
+
 def generer_ressource(type_ressource: str, titre_cours: str, contenu_texte: str | None,
                        matiere_nom: str, niveau_nom: str,
                        niveau_id: str | None, matiere_id: str | None,
-                       etablissement_id: str | None, enseignant_id: str, pays: str | None = None) -> dict:
+                       etablissement_id: str | None, enseignant_id: str, pays: str | None = None,
+                       difficulte: str = "moyen") -> dict:
     passages = _rechercher_contexte(matiere_nom, niveau_nom, titre_cours,
                                       niveau_id, matiere_id, etablissement_id, enseignant_id, pays)
 
@@ -158,6 +166,7 @@ def generer_ressource(type_ressource: str, titre_cours: str, contenu_texte: str 
     prompt = (
         f"Prépare {INSTRUCTIONS_PAR_TYPE[type_ressource]}\n\n"
         f"Matière : {matiere_nom}. Niveau : {niveau_nom}. Titre du cours : « {titre_cours} ».\n"
+        f"Niveau de difficulté souhaité : {LABELS_DIFFICULTE.get(difficulte, LABELS_DIFFICULTE['moyen'])}.\n"
     )
     if contenu_texte:
         prompt += f"\nContenu réellement enseigné en classe (à utiliser en priorité) :\n{contenu_texte}\n"

@@ -317,6 +317,8 @@ class DepotCours(BaseModel):
     contenu_texte: str | None = None
     fichier_url: str | None = None
     date_seance: str | None = None
+    date_echeance: str | None = None
+    difficulte: str = "moyen"  # 'facile' | 'moyen' | 'difficile' — voir TODO.md point 19.7
 
 
 class RessourceGeneree(BaseModel):
@@ -331,6 +333,8 @@ class CoursResume(BaseModel):
     matiere: str
     classe: str
     created_at: datetime
+    date_echeance: str | None = None
+    difficulte: str = "moyen"
     nombre_ressources_validees: int
     nombre_ressources_total: int
 
@@ -342,7 +346,19 @@ class CoursDetail(BaseModel):
     classe: str
     contenu_texte: str | None
     created_at: datetime
+    date_echeance: str | None = None
+    difficulte: str = "moyen"
     ressources: list[dict]
+
+
+class ModificationEcheanceCours(BaseModel):
+    date_echeance: str | None = None  # null pour retirer l'échéance
+
+
+class DuplicationCours(BaseModel):
+    classe_id: str | None = None
+    classe_personnelle_id: str | None = None
+    # Exactement l'un des deux, même logique que DepotCours
 
 
 class ModificationRessource(BaseModel):
@@ -713,6 +729,7 @@ class DemandeGenerationLibre(BaseModel):
     matiere_id: str
     theme: str
     quantite: int = 3  # 1 à 5, validé côté endpoint — combien d'exercices générer d'un coup
+    difficulte: str = "moyen"  # 'facile' | 'moyen' | 'difficile' — voir TODO.md point 19.7
 
 
 class ExerciceGenereLibre(BaseModel):
@@ -726,6 +743,7 @@ class ExerciceGenereLibre(BaseModel):
     etapes: list[str]
     contexte: str | None
     tags: list[str]
+    difficulte: str = "moyen"
     statut: str
     created_at: datetime
 

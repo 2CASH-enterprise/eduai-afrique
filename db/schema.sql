@@ -306,6 +306,9 @@ CREATE TABLE cours (
     contenu_texte       TEXT,
     fichier_url         TEXT,                          -- PDF / Word / PPT déposé
     date_seance         DATE,
+    date_echeance       DATE,
+    difficulte          TEXT NOT NULL DEFAULT 'moyen'
+                        CHECK (difficulte IN ('facile', 'moyen', 'difficile')),
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT cours_une_seule_classe CHECK ((classe_id IS NULL) != (classe_personnelle_id IS NULL))
@@ -576,6 +579,8 @@ CREATE TABLE exercices_generation_libre (
     etapes              TEXT[],
     contexte            TEXT,
     tags                TEXT[] DEFAULT '{}',
+    difficulte          TEXT NOT NULL DEFAULT 'moyen'
+                        CHECK (difficulte IN ('facile', 'moyen', 'difficile')),
     statut              TEXT NOT NULL DEFAULT 'en_attente'
                         CHECK (statut IN ('en_attente', 'valide', 'rejete')),
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now()

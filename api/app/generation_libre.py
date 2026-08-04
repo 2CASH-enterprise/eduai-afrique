@@ -31,20 +31,28 @@ def _system_prompt(pays: str | None) -> str:
     )
 
 
-def _construire_prompt(matiere: str, niveau: str, theme: str, pays: str | None) -> str:
+LABELS_DIFFICULTE = {
+    "facile": "plutôt facile, accessible, avec des étapes bien guidées",
+    "moyen": "de difficulté moyenne, standard pour ce niveau",
+    "difficile": "exigeant, pour des élèves à l'aise avec la matière",
+}
+
+
+def _construire_prompt(matiere: str, niveau: str, theme: str, pays: str | None, difficulte: str = "moyen") -> str:
     pays_texte = pays or "le pays de l'enseignant"
     return f"""Génère UN exercice de {matiere} pour la classe de {niveau}, \
 sur le thème "{theme}".
 
 Contraintes :
 1. Conforme au programme officiel de {pays_texte}.
-2. Énoncé clair, corrigé détaillé avec étapes de raisonnement.
-3. Utilise si possible un contexte local (agriculture, marché, vie \
+2. Niveau de difficulté souhaité : {LABELS_DIFFICULTE.get(difficulte, LABELS_DIFFICULTE['moyen'])}.
+3. Énoncé clair, corrigé détaillé avec étapes de raisonnement.
+4. Utilise si possible un contexte local (agriculture, marché, vie \
 quotidienne en {pays_texte}) — sans le forcer si le thème ne s'y prête pas."""
 
 
 def generer_exercice_a_la_demande(matiere: str, niveau: str, theme: str, passages_contexte: list[str] | None = None,
-                                    pays: str | None = None) -> dict:
+                                    pays: str | None = None, difficulte: str = "moyen") -> dict:
     """Appelle Mistral directement et retourne le JSON parsé. Lève une
     HTTPException explicite en cas d'échec — contrairement au pipeline par
     lot, ici il y a un utilisateur en attente d'une réponse immédiate, donc
@@ -58,7 +66,7 @@ def generer_exercice_a_la_demande(matiere: str, niveau: str, theme: str, passage
     if not api_key:
         raise HTTPException(status_code=503, detail="MISTRAL_API_KEY absente sur le serveur")
 
-    prompt = _construire_prompt(matiere, niveau, theme, pays)
+    prompt = _construire_prompt(matiere, niveau, theme, pays, difficulte)
     if passages_contexte:
         prompt += (
             "\n\nExtraits de référence disponibles (programme officiel et/ou notes de cours) — "

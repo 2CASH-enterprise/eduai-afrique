@@ -66,6 +66,27 @@ async function apiFetch(path, { method = "GET", token, body, params } = {}) {
   return donnees;
 }
 
+// Téléchargement d'un fichier binaire (PDF) — apiFetch ne gère que le
+// JSON, il faut passer par un blob + un lien temporaire pour déclencher
+// le téléchargement, tout en gardant l'en-tête d'authentification.
+async function telechargerFichier(path, token, nomParDefaut) {
+  const reponse = await fetch(`${API_BASE_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!reponse.ok) {
+    let message = `Erreur ${reponse.status}`;
+    try { message = (await reponse.json())?.detail || message; } catch { /* corps non JSON */ }
+    throw new ErreurApi(message, reponse.status);
+  }
+  const blob = await reponse.blob();
+  const url = window.URL.createObjectURL(blob);
+  const lien = document.createElement("a");
+  lien.href = url;
+  lien.download = nomParDefaut;
+  document.body.appendChild(lien);
+  lien.click();
+  lien.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 /* ------------------------------------------------------------------ */
 /*  Constantes d'affichage (icônes/texture papier par matière — pas de */
 /*  données métier, juste du style, donc toujours en dur ici)          */
@@ -943,6 +964,17 @@ function EcranEleveDetail({ eleveActif, classeActive, token, setVue }) {
 /*  Écran : Mes cours                                                   */
 /* ------------------------------------------------------------------ */
 
+function infoEcheance(dateEcheance) {
+  if (!dateEcheance) return null;
+  const aujourdHui = new Date(); aujourdHui.setHours(0, 0, 0, 0);
+  const echeance = new Date(dateEcheance + "T00:00:00");
+  const joursRestants = Math.round((echeance - aujourdHui) / 86400000);
+  const label = echeance.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+  if (joursRestants < 0) return { label: `Échéance dépassée (${label})`, bg: C.rougeFond, fg: C.rouge };
+  if (joursRestants <= 7) return { label: `Pour le ${label}`, bg: C.ambreFond, fg: C.ambre };
+  return { label: `Pour le ${label}`, bg: C.bleuFond, fg: C.encre };
+}
+
 function EcranMesCours({ cours, chargement, erreur, setVue, setCoursActifId, classes }) {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
@@ -961,6 +993,7 @@ function EcranMesCours({ cours, chargement, erreur, setVue, setCoursActifId, cla
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {cours.map((c) => {
             const { icon: Icon, papier } = infoMatiere(c.matiere);
+            const echeance = infoEcheance(c.date_echeance);
             return (
               <button
                 key={c.id}
@@ -968,14 +1001,19 @@ function EcranMesCours({ cours, chargement, erreur, setVue, setCoursActifId, cla
                 className={`eduai-focus text-left rounded-xl p-5 border eduai-paper-${papier} transition-transform hover:-translate-y-0.5`}
                 style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne, borderLeft: `3px solid ${C.accent}` }}
               >
-                <div className="flex items-start justify-between mb-3">
+                <div className="flex items-start justify-between mb-3 gap-2">
                   <Icon size={16} color={C.encre} />
-                  <span className="eduai-mono text-[10px] px-2 py-0.5 rounded-full" style={{ backgroundColor: C.vertFond, color: C.vert }}>
+                  <span className="eduai-mono text-[10px] px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: C.vertFond, color: C.vert }}>
                     {c.nombre_ressources_validees}/{c.nombre_ressources_total} validées
                   </span>
                 </div>
                 <p className="text-xs font-medium mb-1.5" style={{ color: C.encreDoux }}>{c.matiere} · {c.classe}</p>
-                <p className="text-sm font-semibold leading-snug" style={{ color: C.encre }}>{c.titre}</p>
+                <p className="text-sm font-semibold leading-snug mb-2" style={{ color: C.encre }}>{c.titre}</p>
+                {echeance && (
+                  <span className="eduai-mono text-[10px] px-2 py-0.5 rounded-full inline-block" style={{ backgroundColor: echeance.bg, color: echeance.fg }}>
+                    {echeance.label}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -1008,6 +1046,8 @@ function EcranDeposerCours({ classes, token, setVue, onCoursDepose }) {
 
   const [titre, setTitre] = useState("");
   const [contenu, setContenu] = useState("");
+  const [difficulte, setDifficulte] = useState("moyen");
+  const [dateEcheance, setDateEcheance] = useState("");
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState(null);
 
@@ -1016,7 +1056,7 @@ function EcranDeposerCours({ classes, token, setVue, onCoursDepose }) {
     const [type, id, matiere_id] = choix.split(":");
     setEnvoi(true); setErreur(null);
     try {
-      const body = { titre, matiere_id, contenu_texte: contenu || null };
+      const body = { titre, matiere_id, contenu_texte: contenu || null, difficulte, date_echeance: dateEcheance || null };
       if (type === "etab") body.classe_id = id; else body.classe_personnelle_id = id;
       const cours = await apiFetch("/enseignant/cours", { method: "POST", token, body });
       onCoursDepose(cours);
@@ -1084,6 +1124,25 @@ function EcranDeposerCours({ classes, token, setVue, onCoursDepose }) {
             className="eduai-focus eduai-textarea w-full rounded-lg px-3.5 py-2.5 text-sm outline-none border"
             style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
         </label>
+
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className="text-xs font-medium mb-1.5 block" style={{ color: C.encreDoux }}>Niveau de difficulté</span>
+            <select value={difficulte} onChange={(e) => setDifficulte(e.target.value)}
+              className="eduai-focus w-full rounded-lg px-3.5 py-2.5 text-sm outline-none border"
+              style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}>
+              <option value="facile">Facile</option>
+              <option value="moyen">Moyen</option>
+              <option value="difficile">Difficile</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-medium mb-1.5 block" style={{ color: C.encreDoux }}>Échéance (optionnel)</span>
+            <input type="date" value={dateEcheance} onChange={(e) => setDateEcheance(e.target.value)}
+              className="eduai-focus w-full rounded-lg px-3.5 py-2.5 text-sm outline-none border"
+              style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
+          </label>
+        </div>
 
         <button
           type="submit" disabled={envoi}
@@ -1326,7 +1385,7 @@ function RenduRessource({ type, contenu }) {
   }
 }
 
-function EcranCoursDetail({ coursId, token, setVue }) {
+function EcranCoursDetail({ coursId, token, setVue, classes }) {
   const [cours, setCours] = useState(null);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
@@ -1334,15 +1393,26 @@ function EcranCoursDetail({ coursId, token, setVue }) {
   const [brouillon, setBrouillon] = useState("");
   const [enregistrement, setEnregistrement] = useState(false);
 
+  const [echeanceEnEdition, setEcheanceEnEdition] = useState(false);
+  const [echeanceBrouillon, setEcheanceBrouillon] = useState("");
+  const [dupliquerOuvert, setDupliquerOuvert] = useState(false);
+  const [classesPerso, setClassesPerso] = useState([]);
+  const [classeChoisieDupli, setClasseChoisieDupli] = useState("");
+  const [dupliqueEnCours, setDupliqueEnCours] = useState(false);
+  const [exportEnCours, setExportEnCours] = useState(null);
+
   const charger = useCallback(() => {
     setChargement(true); setErreur(null);
     apiFetch(`/enseignant/cours/${coursId}`, { token })
-      .then(setCours)
+      .then((c) => { setCours(c); setEcheanceBrouillon(c.date_echeance || ""); })
       .catch((e) => setErreur(e.message))
       .finally(() => setChargement(false));
   }, [coursId, token]);
 
   useEffect(() => { charger(); }, [charger]);
+  useEffect(() => {
+    apiFetch("/enseignant/classes-personnelles", { token }).then(setClassesPerso).catch(() => {});
+  }, [token]);
 
   async function majRessource(ressourceId, changements) {
     setEnregistrement(true); setErreur(null);
@@ -1352,6 +1422,41 @@ function EcranCoursDetail({ coursId, token, setVue }) {
       setEditionId(null);
     } catch (e) { setErreur(e.message); }
     finally { setEnregistrement(false); }
+  }
+
+  async function enregistrerEcheance() {
+    setErreur(null);
+    try {
+      await apiFetch(`/enseignant/cours/${coursId}/echeance`, { method: "PATCH", token, body: { date_echeance: echeanceBrouillon || null } });
+      await charger();
+      setEcheanceEnEdition(false);
+    } catch (e) { setErreur(e.message); }
+  }
+
+  const optionsDupli = [
+    ...classes.map((cl) => ({ valeur: `etab:${cl.classe_id}`, label: `${cl.nom} — ${cl.matiere} (${cl.etablissement_nom})` })),
+    ...classesPerso.map((cl) => ({ valeur: `perso:${cl.id}`, label: `${cl.nom} — ${cl.matiere} (personnelle)` })),
+  ];
+
+  async function dupliquer() {
+    if (!classeChoisieDupli) return;
+    const [type, id] = classeChoisieDupli.split(":");
+    setDupliqueEnCours(true); setErreur(null);
+    try {
+      const body = type === "etab" ? { classe_id: id } : { classe_personnelle_id: id };
+      const nouveauCours = await apiFetch(`/enseignant/cours/${coursId}/dupliquer`, { method: "POST", token, body });
+      setDupliquerOuvert(false);
+      setVue("mes-cours");
+      // Petite pause visuelle avant de rediriger vers le nouveau cours n'est pas nécessaire : retour à la liste suffit.
+    } catch (e) { setErreur(e.message); }
+    finally { setDupliqueEnCours(false); }
+  }
+
+  async function exporter(cle, chemin, nomFichier) {
+    setExportEnCours(cle); setErreur(null);
+    try { await telechargerFichier(chemin, token, nomFichier); }
+    catch (e) { setErreur(e.message); }
+    finally { setExportEnCours(null); }
   }
 
   if (chargement) return <div className="max-w-2xl mx-auto px-4 sm:px-8 py-10"><Chargement label="Chargement du cours..." /></div>;
@@ -1364,8 +1469,60 @@ function EcranCoursDetail({ coursId, token, setVue }) {
         <ChevronLeft size={14} /> Retour à mes cours
       </button>
 
-      <p className="text-xs font-medium mb-1" style={{ color: C.accentFonce }}>{cours.matiere} · {cours.classe}</p>
-      <h1 className="eduai-display text-2xl mb-8" style={{ color: C.encre }}>{cours.titre}</h1>
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div>
+          <p className="text-xs font-medium mb-1" style={{ color: C.accentFonce }}>{cours.matiere} · {cours.classe}</p>
+          <h1 className="eduai-display text-2xl" style={{ color: C.encre }}>{cours.titre}</h1>
+        </div>
+        <span className="eduai-mono text-[10px] px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: C.bleuFond, color: C.encre }}>
+          {DIFFICULTE_LABEL[cours.difficulte] || cours.difficulte}
+        </span>
+      </div>
+
+      {/* Échéance */}
+      <div className="mb-4">
+        {echeanceEnEdition ? (
+          <div className="flex items-center gap-2">
+            <input type="date" value={echeanceBrouillon} onChange={(e) => setEcheanceBrouillon(e.target.value)}
+              className="eduai-focus rounded-lg px-3 py-1.5 text-xs outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
+            <button onClick={enregistrerEcheance} className="eduai-focus text-xs font-semibold" style={{ color: C.accentFonce }}>Enregistrer</button>
+            <button onClick={() => { setEcheanceEnEdition(false); setEcheanceBrouillon(cours.date_echeance || ""); }} className="eduai-focus text-xs" style={{ color: C.encreAttenue }}>Annuler</button>
+          </div>
+        ) : (
+          <button onClick={() => setEcheanceEnEdition(true)} className="eduai-focus flex items-center gap-1.5 text-xs" style={{ color: C.encreDoux }}>
+            <CalendarX size={12} />
+            {cours.date_echeance
+              ? `Échéance : ${new Date(cours.date_echeance + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`
+              : "Ajouter une échéance"}
+          </button>
+        )}
+      </div>
+
+      {/* Actions : dupliquer, exporter tout */}
+      <div className="flex flex-wrap items-center gap-2 mb-8">
+        <button onClick={() => setDupliquerOuvert((o) => !o)} className="eduai-focus flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border" style={{ borderColor: C.ligne, color: C.encre }}>
+          <Share2 size={12} /> Dupliquer vers une autre classe
+        </button>
+        <button onClick={() => exporter("tout", `/enseignant/cours/${coursId}/export-pdf`, `${cours.titre}.pdf`)} disabled={exportEnCours === "tout"}
+          className="eduai-focus flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border disabled:opacity-60" style={{ borderColor: C.ligne, color: C.encre }}>
+          {exportEnCours === "tout" ? <Loader2 size={12} className="eduai-spin" /> : <FileText size={12} />} Exporter tout en PDF
+        </button>
+      </div>
+
+      {dupliquerOuvert && (
+        <div className="rounded-lg p-4 border mb-8 space-y-2.5" style={{ borderColor: C.ligne, backgroundColor: C.fond }}>
+          <p className="text-xs font-medium" style={{ color: C.encreDoux }}>Dupliquer ce cours (avec ses 6 ressources, à revalider) vers :</p>
+          <select value={classeChoisieDupli} onChange={(e) => setClasseChoisieDupli(e.target.value)}
+            className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }}>
+            <option value="">Choisir une classe...</option>
+            {optionsDupli.map((o) => <option key={o.valeur} value={o.valeur}>{o.label}</option>)}
+          </select>
+          <button onClick={dupliquer} disabled={!classeChoisieDupli || dupliqueEnCours}
+            className="eduai-focus rounded-lg px-3.5 py-2 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
+            {dupliqueEnCours ? <Loader2 size={12} className="eduai-spin" /> : "Dupliquer"}
+          </button>
+        </div>
+      )}
 
       <BandeauErreur message={erreur} />
 
@@ -1381,15 +1538,21 @@ function EcranCoursDetail({ coursId, token, setVue }) {
                   <Icon size={15} color={C.accentFonce} />
                   <span className="text-sm font-semibold" style={{ color: C.encre }}>{r.label || meta.label}</span>
                 </div>
-                {r.statut === "valide" && (
+                <div className="flex items-center gap-2">
+                  <button onClick={() => exporter(r.id, `/enseignant/cours/${coursId}/ressources/${r.id}/export-pdf`, `${cours.titre} - ${r.label}.pdf`)}
+                    disabled={exportEnCours === r.id} className="eduai-focus disabled:opacity-60" aria-label="Exporter en PDF" style={{ color: C.encreAttenue }}>
+                    {exportEnCours === r.id ? <Loader2 size={13} className="eduai-spin" /> : <FileText size={13} />}
+                  </button>
+                  {r.statut === "valide" && (
                   <span className="eduai-mono text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1" style={{ backgroundColor: C.vertFond, color: C.vert }}><Check size={10} /> Validée</span>
                 )}
                 {r.statut === "corrige" && (
                   <span className="eduai-mono text-[10px] px-2 py-0.5 rounded-full" style={{ backgroundColor: C.bleuFond, color: C.encre }}>Modifiée</span>
                 )}
-                {r.statut === "en_attente" && (
+                  {r.statut === "en_attente" && (
                   <span className="eduai-mono text-[10px] px-2 py-0.5 rounded-full" style={{ backgroundColor: C.ambreFond, color: C.ambre }}>À relire</span>
                 )}
+                </div>
               </div>
 
               {enEdition ? (
@@ -1947,14 +2110,23 @@ function EcranMesDocuments({ token, classes }) {
 /*  Écran : Génération libre (sans classe, sans établissement)         */
 /* ------------------------------------------------------------------ */
 
-function CarteExerciceGenereLibre({ exercice, onStatutChange }) {
+function CarteExerciceGenereLibre({ exercice, onStatutChange, token }) {
   const [ouvertCorrige, setOuvertCorrige] = useState(false);
   const [enCours, setEnCours] = useState(false);
+  const [exportEnCours, setExportEnCours] = useState(false);
+  const [erreurExport, setErreurExport] = useState(null);
 
   async function changerStatut(nouveauStatut) {
     setEnCours(true);
     try { await onStatutChange(exercice.id, nouveauStatut); }
     finally { setEnCours(false); }
+  }
+
+  async function exporter() {
+    setExportEnCours(true); setErreurExport(null);
+    try { await telechargerFichier(`/enseignant/generation-libre/${exercice.id}/export-pdf`, token, `${exercice.theme}.pdf`); }
+    catch (e) { setErreurExport(e.message); }
+    finally { setExportEnCours(false); }
   }
 
   const badge = {
@@ -1970,8 +2142,17 @@ function CarteExerciceGenereLibre({ exercice, onStatutChange }) {
           <h3 className="eduai-display text-base" style={{ color: C.encre }}>{exercice.theme}</h3>
           {exercice.sous_theme && <p className="text-xs" style={{ color: C.encreAttenue }}>{exercice.sous_theme}</p>}
         </div>
-        <span className="eduai-mono text-[10px] px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: badge.bg, color: badge.fg }}>{badge.label}</span>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button onClick={exporter} disabled={exportEnCours} className="eduai-focus disabled:opacity-60" aria-label="Exporter en PDF" style={{ color: C.encreAttenue }}>
+            {exportEnCours ? <Loader2 size={13} className="eduai-spin" /> : <FileText size={13} />}
+          </button>
+          <span className="eduai-mono text-[10px] px-2 py-0.5 rounded-full" style={{ backgroundColor: C.bleuFond, color: C.encre }}>
+            {DIFFICULTE_LABEL[exercice.difficulte] || exercice.difficulte}
+          </span>
+          <span className="eduai-mono text-[10px] px-2 py-0.5 rounded-full" style={{ backgroundColor: badge.bg, color: badge.fg }}>{badge.label}</span>
+        </div>
       </div>
+      {erreurExport && <p className="text-xs mb-2" style={{ color: C.rouge }}>{erreurExport}</p>}
 
       <p className="text-sm font-semibold mb-1 mt-3" style={{ color: C.encre }}>Énoncé</p>
       <p className="text-sm mb-3 whitespace-pre-wrap" style={{ color: C.encreDoux }}>{exercice.enonce}</p>
@@ -2019,6 +2200,7 @@ function EcranGenerationLibre({ token }) {
   const [niveau, setNiveau] = useState("");
   const [theme, setTheme] = useState("");
   const [quantite, setQuantite] = useState(3);
+  const [difficulte, setDifficulte] = useState("moyen");
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState(null);
 
@@ -2041,7 +2223,7 @@ function EcranGenerationLibre({ token }) {
     setEnCours(true); setErreur(null);
     try {
       await apiFetch("/enseignant/generation-libre", {
-        method: "POST", token, body: { matiere_id: matiereId, niveau, theme, quantite: Number(quantite) },
+        method: "POST", token, body: { matiere_id: matiereId, niveau, theme, quantite: Number(quantite), difficulte },
       });
       setTheme("");
       chargerHistorique();
@@ -2090,6 +2272,13 @@ function EcranGenerationLibre({ token }) {
             className="eduai-focus rounded-lg px-3 py-1.5 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}>
             {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
+          <span className="text-xs font-medium ml-2" style={{ color: C.encreDoux }}>Difficulté</span>
+          <select value={difficulte} onChange={(e) => setDifficulte(e.target.value)}
+            className="eduai-focus rounded-lg px-3 py-1.5 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}>
+            <option value="facile">Facile</option>
+            <option value="moyen">Moyen</option>
+            <option value="difficile">Difficile</option>
+          </select>
         </label>
         <button type="submit" disabled={enCours}
           className="eduai-focus flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
@@ -2103,7 +2292,7 @@ function EcranGenerationLibre({ token }) {
             <div className="mb-8">
               <h2 className="eduai-display text-lg mb-3" style={{ color: C.encre }}>À relire ({enAttente.length})</h2>
               <div className="space-y-4">
-                {enAttente.map((ex) => <CarteExerciceGenereLibre key={ex.id} exercice={ex} onStatutChange={changerStatut} />)}
+                {enAttente.map((ex) => <CarteExerciceGenereLibre key={ex.id} exercice={ex} onStatutChange={changerStatut} token={token} />)}
               </div>
             </div>
           )}
@@ -2112,7 +2301,7 @@ function EcranGenerationLibre({ token }) {
             <div>
               <h2 className="eduai-display text-lg mb-3" style={{ color: C.encre }}>Historique</h2>
               <div className="space-y-4">
-                {traites.map((ex) => <CarteExerciceGenereLibre key={ex.id} exercice={ex} onStatutChange={changerStatut} />)}
+                {traites.map((ex) => <CarteExerciceGenereLibre key={ex.id} exercice={ex} onStatutChange={changerStatut} token={token} />)}
               </div>
             </div>
           )}
@@ -2373,7 +2562,7 @@ export default function App() {
 
           {vue === "mes-cours" && <EcranMesCours cours={cours} chargement={chargementCours} erreur={erreurCours} setVue={setVue} setCoursActifId={setCoursActifId} classes={classes} />}
           {vue === "deposer-cours" && <EcranDeposerCours classes={classes} token={token} setVue={setVue} onCoursDepose={onCoursDepose} />}
-          {vue === "cours-detail" && coursActifId && <EcranCoursDetail coursId={coursActifId} token={token} setVue={setVue} />}
+          {vue === "cours-detail" && coursActifId && <EcranCoursDetail coursId={coursActifId} token={token} setVue={setVue} classes={classes} />}
           {vue === "generation-libre" && <EcranGenerationLibre token={token} />}
           {vue === "mes-credits" && <EcranMesCredits token={token} />}
           {vue === "invitations" && <EcranInvitations token={token} onTraitee={() => apiFetch("/enseignant/invitations", { token }).then((inv) => setNombreInvitations(inv.length)).catch(() => {})} />}
