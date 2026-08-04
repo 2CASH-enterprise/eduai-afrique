@@ -1038,8 +1038,11 @@ function EcranDeposerCours({ classes, token, setVue, onCoursDepose }) {
       </button>
 
       <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Déposer un cours</h1>
-      <p className="text-sm mb-8" style={{ color: C.encreDoux }}>
+      <p className="text-sm mb-2" style={{ color: C.encreDoux }}>
         L'IA génère automatiquement une fiche pédagogique, un résumé, des exercices, un QCM, un devoir et un contrôle.
+      </p>
+      <p className="flex items-center gap-1.5 text-xs mb-8" style={{ color: C.encreAttenue }}>
+        <AlertTriangle size={11} /> EduAI peut faire des erreurs, toujours vérifier les informations et surtout valider les exercices avant de les mettre à la disposition des élèves.
       </p>
 
       <BandeauErreur message={erreur} />
@@ -2049,10 +2052,13 @@ function EcranGenerationLibre({ token }) {
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
       <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Génération libre</h1>
-      <p className="text-sm mb-8" style={{ color: C.encreDoux }}>
+      <p className="text-sm mb-2" style={{ color: C.encreDoux }}>
         Génère une série d'exercices corrigés sur le niveau et le thème de ton choix — utile pour préparer du contenu sur
         plusieurs classes que tu enseignes, sans dépendre d'une classe déclarée. Une fois validés, ils enrichissent
         silencieusement le corpus utilisé par l'IA. Toujours gratuit, quel que soit ton solde de crédits.
+      </p>
+      <p className="flex items-center gap-1.5 text-xs mb-8" style={{ color: C.encreAttenue }}>
+        <AlertTriangle size={11} /> EduAI peut faire des erreurs, toujours vérifier les informations et surtout valider les exercices avant de les mettre à la disposition des élèves.
       </p>
 
       <BandeauErreur message={erreur} />
