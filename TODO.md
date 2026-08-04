@@ -258,6 +258,26 @@ de formule (upgrade/downgrade — qui déclenche ça, l'Admin Plateforme ?).
 
 ---
 
+## 18. Rwanda — recherche de programmes officiels, bloquée par la langue
+
+**Recherche faite le 04/08** : l'organisme responsable est identifié (REB
+— Rwanda Education Board, `reb.gov.rw`), et de vrais documents officiels
+existent et sont accessibles :
+- Mathematics Syllabus secondaire (S1-S3) : https://www.cur.ac.rw/mis/main/library/documents/book_file/digital-63f5d7ce431026.25518009.pdf
+- Competence-Based Curriculum, vue d'ensemble : https://www.cur.ac.rw/mis/main/library/documents/book_file/digital-63f49bc5eeafa8.81233706.pdf
+- Mathematics Syllabus primaire (P4-P6) : https://elearning.reb.rw/pluginfile.php/177314/mod_folder/content/0/P4-P6%20Mathematics%20Syllabus.pdf?forcedownload=1
+
+**Blocage identifié, décision prise le 04/08** : depuis la réforme
+linguistique de 2008-2010, le curriculum rwandais est **entièrement en
+anglais**, malgré l'appartenance du pays à la Francophonie — incompatible
+avec une plateforme entièrement française (interface, prompts IA,
+génération). Décision : **le Rwanda reste bloqué** dans `pays_couverture`
+jusqu'à ce qu'une vraie source en français soit trouvée (traduction
+officielle, ou programme d'un cursus francophone local s'il en existe un).
+Ne pas déposer les documents anglais tels quels.
+
+---
+
 ## 17. Couverture par pays à l'inscription — ✅ FAIT le 04/08
 
 **Discuté et cadré le 04/08**, en préparation du lancement en test ouvert
