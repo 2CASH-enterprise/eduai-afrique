@@ -10,7 +10,8 @@ from ..security import hacher_mot_de_passe
 from ..schemas import (AdminPlateformeConnecte, DocumentPedagogique, PassageRecherche,
                         EtablissementResume, CreationEtablissement, EtablissementCree, CompteCree,
                         ExerciceBiblioCommune, LigneImportDocument, DemandeImportDocuments,
-                        ResultatLigneImportDocument, RapportImportDocuments)
+                        ResultatLigneImportDocument, RapportImportDocuments,
+                        PaysCouverture, ModificationPaysCouverture)
 
 router = APIRouter(prefix="/plateforme", tags=["admin-plateforme"])
 
@@ -315,3 +316,40 @@ def retirer_de_la_bibliotheque_commune(exercice_id: str, admin: AdminPlateformeC
         )
         if cur.fetchone() is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exercice introuvable dans la bibliothèque commune")
+
+
+@router.get("/pays", response_model=list[PaysCouverture])
+def lister_couverture_pays(admin: AdminPlateformeConnecte = Depends(get_admin_plateforme_connecte)):
+    """Statut de couverture par pays (voir migration 012) — un pays reste
+    bloqué à l'inscription tant qu'il n'est pas explicitement activé ici,
+    même s'il contient déjà quelques documents."""
+    with get_cursor() as cur:
+        cur.execute("SELECT pays, actif FROM pays_couverture ORDER BY pays")
+        lignes = cur.fetchall()
+    return [PaysCouverture(pays=p, actif=a) for p, a in lignes]
+
+
+@router.patch("/pays/{pays}", response_model=PaysCouverture)
+def modifier_couverture_pays(pays: str, payload: ModificationPaysCouverture,
+                               admin: AdminPlateformeConnecte = Depends(get_admin_plateforme_connecte)):
+    with get_cursor(commit=True) as cur:
+        cur.execute(
+            "UPDATE pays_couverture SET actif = %s, updated_at = now() WHERE pays = %s RETURNING pays, actif",
+            (payload.actif, pays),
+        )
+        row = cur.fetchone()
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pays introuvable dans la liste de couverture")
+    return PaysCouverture(pays=row[0], actif=row[1])
+
+
+@router.get("/liste-attente", response_model=list[dict])
+def lister_liste_attente(admin: AdminPlateformeConnecte = Depends(get_admin_plateforme_connecte)):
+    """Emails en attente d'un pays pas encore couvert — utile pour
+    recontacter ces personnes dès l'activation."""
+    with get_cursor() as cur:
+        cur.execute(
+            "SELECT email, pays, role, created_at FROM liste_attente_inscriptions ORDER BY created_at DESC"
+        )
+        lignes = cur.fetchall()
+    return [{"email": e, "pays": p, "role": r, "created_at": c.isoformat()} for e, p, r, c in lignes]

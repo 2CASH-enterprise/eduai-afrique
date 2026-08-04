@@ -672,6 +672,20 @@ class InscriptionEnseignant(BaseModel):
     specialite: str | None = None
 
 
+class ReponseListeAttente(BaseModel):
+    statut: str = "liste_attente"
+    message: str
+
+
+class PaysCouverture(BaseModel):
+    pays: str
+    actif: bool
+
+
+class ModificationPaysCouverture(BaseModel):
+    actif: bool
+
+
 class InvitationEnvoyee(BaseModel):
     id: str
     enseignant_email: str

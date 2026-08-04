@@ -258,6 +258,33 @@ de formule (upgrade/downgrade — qui déclenche ça, l'Admin Plateforme ?).
 
 ---
 
+## 17. Couverture par pays à l'inscription — ✅ FAIT le 04/08
+
+**Discuté et cadré le 04/08**, en préparation du lancement en test ouvert
+du module Enseignants pour la rentrée : un enseignant indépendant qui
+tente de s'inscrire depuis un pays sans corpus documentaire suffisant
+n'obtient plus de vrai compte — juste un message clair, et son email est
+conservé pour recontact ultérieur.
+
+**Modèle retenu** : statut explicite par pays, décidé par l'Admin
+Plateforme (pas déduit automatiquement du nombre de documents déposés) —
+un pays reste bloqué tant qu'il n'est pas jugé prêt, même s'il contient
+déjà quelques documents. **Seule la Côte d'Ivoire est active au
+lancement** (74 documents, large couverture) — le Sénégal (14 documents)
+reste volontairement bloqué pour l'instant, comme tous les autres pays.
+
+**Construit et déployé** : tables `pays_couverture` et
+`liste_attente_inscriptions` (migration 012), `POST
+/auth/inscription-enseignant` vérifie la couverture avant de créer un
+compte (retourne 202 + message si le pays est bloqué, ajoute l'email en
+liste d'attente sans doublon), endpoints Admin Plateforme `GET/PATCH
+/plateforme/pays` et `GET /plateforme/liste-attente`, écran "Pays" dédié
+(bascule actif/bloqué par pays + liste d'attente consultable), écran
+d'inscription enseignant adapté pour afficher clairement le message de
+liste d'attente au lieu de connecter automatiquement.
+
+---
+
 ## 16. Historique des validations d'exercices rendu persistant — ✅ FAIT le 03/08
 
 **Découvert en lisant une note laissée dans le code** ("Un vrai historique

@@ -583,6 +583,24 @@ CREATE TABLE exercices_generation_libre (
 CREATE INDEX idx_exgl_enseignant ON exercices_generation_libre(enseignant_id);
 CREATE INDEX idx_exgl_statut ON exercices_generation_libre(statut);
 
+-- ============================================================================
+-- Couverture par pays — blocage des inscriptions sans corpus (migration 012)
+-- ============================================================================
+CREATE TABLE pays_couverture (
+    pays        TEXT PRIMARY KEY,
+    actif       BOOLEAN NOT NULL DEFAULT false,
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE liste_attente_inscriptions (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email       TEXT NOT NULL,
+    pays        TEXT NOT NULL,
+    role        TEXT NOT NULL DEFAULT 'enseignant',
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (email, pays)
+);
+
 -- Système de crédits enseignant (voir migration 008 pour la logique complète)
 -- ============================================================================
 CREATE TABLE credits_enseignant (

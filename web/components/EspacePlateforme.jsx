@@ -163,6 +163,7 @@ function BarreNav({ vue, setVue, onDeconnexion }) {
     { id: "etablissements", label: "Établissements" },
     { id: "documents", label: "Documents" },
     { id: "bibliotheque", label: "Bibliothèque commune" },
+    { id: "pays", label: "Pays" },
   ];
   return (
     <div className="sticky top-0 z-10 px-4 sm:px-8 py-3.5 flex items-center justify-between border-b flex-wrap gap-y-2"
@@ -625,9 +626,77 @@ function EcranBibliotheque({ token }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Application                                                        */
-/* ------------------------------------------------------------------ */
+function EcranPays({ token }) {
+  const [pays, setPays] = useState([]);
+  const [listeAttente, setListeAttente] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+  const [enCours, setEnCours] = useState(null);
+
+  const charger = useCallback(() => {
+    setChargement(true); setErreur(null);
+    Promise.all([
+      apiFetch("/plateforme/pays", { token }),
+      apiFetch("/plateforme/liste-attente", { token }),
+    ]).then(([p, l]) => { setPays(p); setListeAttente(l); })
+      .catch((e) => setErreur(e.message)).finally(() => setChargement(false));
+  }, [token]);
+
+  useEffect(() => { charger(); }, [charger]);
+
+  async function basculer(nomPays, actifActuel) {
+    setEnCours(nomPays);
+    try {
+      await apiFetch(`/plateforme/pays/${encodeURIComponent(nomPays)}`, { method: "PATCH", token, body: { actif: !actifActuel } });
+      setPays((prev) => prev.map((p) => p.pays === nomPays ? { ...p, actif: !actifActuel } : p));
+    } catch (e) { setErreur(e.message); }
+    finally { setEnCours(null); }
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
+      <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Pays</h1>
+      <p className="text-sm mb-8" style={{ color: C.encreDoux }}>
+        Un pays reste bloqué à l'inscription tant qu'il n'est pas activé ici — même s'il contient déjà quelques
+        documents. Tant qu'un pays est inactif, toute tentative d'inscription y est ajoutée à la liste d'attente
+        ci-dessous, sans créer de compte.
+      </p>
+
+      <BandeauErreur message={erreur} />
+
+      {chargement ? <Chargement /> : (
+        <>
+          <div className="rounded-2xl border divide-y mb-10" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+            {pays.map((p) => (
+              <div key={p.pays} className="flex items-center justify-between px-5 py-3.5" style={{ borderColor: C.ligne }}>
+                <span className="text-sm font-medium" style={{ color: C.encre }}>{p.pays}</span>
+                <button onClick={() => basculer(p.pays, p.actif)} disabled={enCours === p.pays}
+                  className="eduai-focus rounded-full px-3 py-1 text-xs font-semibold disabled:opacity-60"
+                  style={p.actif ? { backgroundColor: C.vertFond, color: C.vert } : { backgroundColor: C.rougeFond, color: C.rouge }}>
+                  {enCours === p.pays ? <Loader2 size={11} className="eduai-spin" /> : (p.actif ? "Actif" : "Bloqué")}
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <h2 className="eduai-display text-lg mb-3" style={{ color: C.encre }}>Liste d'attente ({listeAttente.length})</h2>
+          {listeAttente.length === 0 ? (
+            <p className="text-sm" style={{ color: C.encreDoux }}>Personne en attente pour l'instant.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {listeAttente.map((item, i) => (
+                <div key={i} className="flex items-center justify-between rounded-lg border px-3 py-2" style={{ borderColor: C.ligne }}>
+                  <span className="text-sm" style={{ color: C.encre }}>{item.email}</span>
+                  <span className="text-xs" style={{ color: C.encreAttenue }}>{item.pays}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function App() {
   const [token, setToken] = useState(null);
@@ -660,6 +729,7 @@ export default function App() {
           {vue === "etablissements" && <EcranEtablissements token={token} />}
           {vue === "documents" && <EcranDocuments token={token} />}
           {vue === "bibliotheque" && <EcranBibliotheque token={token} />}
+          {vue === "pays" && <EcranPays token={token} />}
         </>
       )}
     </div>

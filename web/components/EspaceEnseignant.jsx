@@ -227,7 +227,7 @@ const PAYS_DISPONIBLES = [
   "Cameroun", "Sénégal", "Côte d'Ivoire", "République démocratique du Congo", "Bénin", "Togo", "Gabon",
 ];
 
-function EcranConnexion({ onConnexion, onInscription, connexionEnCours, erreurConnexion }) {
+function EcranConnexion({ onConnexion, onInscription, connexionEnCours, erreurConnexion, messageListeAttente }) {
   const [mode, setMode] = useState("connexion"); // "connexion" | "inscription"
   const [email, setEmail] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
@@ -273,6 +273,12 @@ function EcranConnexion({ onConnexion, onInscription, connexionEnCours, erreurCo
 
           <BandeauErreur message={erreurConnexion} />
 
+          {messageListeAttente ? (
+            <div className="rounded-lg px-4 py-3 text-sm flex items-start gap-2" style={{ backgroundColor: C.bleuFond, color: C.encre }}>
+              <Mail size={15} className="mt-0.5 flex-shrink-0" />
+              <span>{messageListeAttente}</span>
+            </div>
+          ) : (
           <form onSubmit={soumettre} className="space-y-4">
             {mode === "inscription" && (
               <div className="grid grid-cols-2 gap-2">
@@ -331,7 +337,8 @@ function EcranConnexion({ onConnexion, onInscription, connexionEnCours, erreurCo
               {mode === "connexion" ? "Se connecter" : "Créer mon compte"}
             </button>
           </form>
-          {mode === "inscription" && (
+          )}
+          {mode === "inscription" && !messageListeAttente && (
             <p className="text-xs mt-4" style={{ color: C.encreAttenue }}>
               Utilisable dès maintenant pour préparer tes cours en mode libre. Si ton établissement rejoint la plateforme plus tard, il pourra t'inviter à le rejoindre.
             </p>
@@ -2253,6 +2260,7 @@ export default function App() {
   const [token, setToken] = useState(null);
   const [connexionEnCours, setConnexionEnCours] = useState(false);
   const [erreurConnexion, setErreurConnexion] = useState(null);
+  const [messageListeAttente, setMessageListeAttente] = useState(null);
 
   const [vue, setVue] = useState("accueil");
   const [chargementInitial, setChargementInitial] = useState(false);
@@ -2293,10 +2301,14 @@ export default function App() {
   }
 
   async function inscrire(payload) {
-    setConnexionEnCours(true); setErreurConnexion(null);
+    setConnexionEnCours(true); setErreurConnexion(null); setMessageListeAttente(null);
     try {
-      const { access_token } = await apiFetch("/auth/inscription-enseignant", { method: "POST", body: payload });
-      setToken(access_token);
+      const reponse = await apiFetch("/auth/inscription-enseignant", { method: "POST", body: payload });
+      if (reponse.statut === "liste_attente") {
+        setMessageListeAttente(reponse.message);
+      } else {
+        setToken(reponse.access_token);
+      }
     } catch (e) { setErreurConnexion(e.message); }
     finally { setConnexionEnCours(false); }
   }
@@ -2350,7 +2362,7 @@ export default function App() {
       <style>{STYLES}</style>
 
       {!token ? (
-        <EcranConnexion onConnexion={connecter} onInscription={inscrire} connexionEnCours={connexionEnCours} erreurConnexion={erreurConnexion} />
+        <EcranConnexion onConnexion={connecter} onInscription={inscrire} connexionEnCours={connexionEnCours} erreurConnexion={erreurConnexion} messageListeAttente={messageListeAttente} />
       ) : (
         <>
           <BarreNav vue={vue} setVue={setVue} onDeconnexion={deconnecter} nombreEnAttente={enAttente.length} nombreInvitations={nombreInvitations} />

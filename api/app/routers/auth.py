@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import JSONResponse
 
 from ..db import get_cursor
 from ..security import verifier_mot_de_passe, hacher_mot_de_passe, creer_token_acces
-from ..schemas import DemandeConnexion, ReponseToken, InscriptionEnseignant
+from ..schemas import DemandeConnexion, ReponseToken, InscriptionEnseignant, ReponseListeAttente
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -43,7 +44,7 @@ def login(payload: DemandeConnexion):
     return ReponseToken(access_token=creer_token_acces(utilisateur_id))
 
 
-@router.post("/inscription-enseignant", response_model=ReponseToken, status_code=status.HTTP_201_CREATED)
+@router.post("/inscription-enseignant", status_code=status.HTTP_201_CREATED)
 def inscription_enseignant(payload: InscriptionEnseignant):
     """Seul rôle qui peut s'auto-inscrire sans dépendre d'un établissement
     (voir TODO.md point 1) — pense aux enseignants dont l'école n'est pas
@@ -51,8 +52,31 @@ def inscription_enseignant(payload: InscriptionEnseignant):
     etablissement_id = NULL ; il pourra rejoindre un établissement plus
     tard via une invitation (voir routers/invitations.py). Connecte
     automatiquement après inscription, comme le reste de la plateforme ne
-    demande jamais une double étape inscription→connexion séparée."""
+    demande jamais une double étape inscription→connexion séparée.
+
+    Bloque désormais les pays sans corpus documentaire suffisant (décidé
+    explicitement par l'Admin Plateforme, voir migration 012 et
+    routers/plateforme.py) — aucun compte n'est créé dans ce cas, mais
+    l'email est conservé en liste d'attente pour recontact ultérieur."""
     with get_cursor(commit=True) as cur:
+        cur.execute("SELECT actif FROM pays_couverture WHERE pays = %s", (payload.pays,))
+        row = cur.fetchone()
+        pays_actif = row[0] if row is not None else False  # pays inconnu de la liste = non couvert par défaut
+
+        if not pays_actif:
+            cur.execute(
+                "INSERT INTO liste_attente_inscriptions (email, pays, role) VALUES (%s, %s, 'enseignant') "
+                "ON CONFLICT (email, pays) DO NOTHING",
+                (payload.email, payload.pays),
+            )
+            return JSONResponse(
+                status_code=status.HTTP_202_ACCEPTED,
+                content=ReponseListeAttente(
+                    message=f"EduAI Afrique n'est pas encore disponible en {payload.pays}. "
+                            "Nous avons bien noté votre email et vous recontacterons dès l'ouverture."
+                ).model_dump(),
+            )
+
         cur.execute("SELECT 1 FROM utilisateurs WHERE email = %s", (payload.email,))
         if cur.fetchone() is not None:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cet email est déjà utilisé")
