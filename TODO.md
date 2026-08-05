@@ -258,20 +258,6 @@ de formule (upgrade/downgrade — qui déclenche ça, l'Admin Plateforme ?).
 
 ---
 
-## 21. Chat contextuel enseignant — envisagé puis abandonné le 04/08
-
-**Idée discutée** : un champ de chat dans le module Enseignant, permettant
-de dialoguer avec l'IA ancrée dans le contexte précis (programme, pays,
-chapitre/exercice enseigné), en s'appuyant sur le RAG déjà en place. Trois
-points restaient à trancher (chat général vs contextuel à un cours,
-sauvegarde ou non de l'historique, et surtout la question du coût — un
-chat s'utilise bien plus intensément qu'une génération ponctuelle,
-tension avec la gratuité volontaire de Génération libre).
-
-**Décision : abandonné**, aucune suite prévue.
-
----
-
 ## 20. Stratégie économique clarifiée + geste "Suggérer EduAI à mon établissement"
 
 **Discuté le 04/08**, éclaire enfin pourquoi le module Enseignant a été
