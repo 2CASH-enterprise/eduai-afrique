@@ -6,6 +6,7 @@ réinjection du contenu généré-validé.
 """
 import io
 import os
+import re
 
 from pypdf import PdfReader
 from mistralai.client import Mistral
@@ -31,6 +32,59 @@ def extraire_texte_pdf(contenu: bytes) -> tuple[str, int]:
 
 
 def decouper_en_passages(texte: str) -> list[str]:
+    """Découpe en respectant les paragraphes du document plutôt qu'un
+    nombre de mots fixe (amélioration du 05/08 — un chapitre pouvait être
+    coupé en plein milieu, ou un passage mélanger deux thèmes différents).
+    Un paragraphe correspond à un bloc séparé par une ligne vide dans le
+    texte extrait ('\\n\\n', y compris les sauts de page — voir
+    extraire_texte_pdf). Regroupe plusieurs paragraphes par passage
+    jusqu'à la taille cible, avec le dernier paragraphe repris en tête du
+    passage suivant pour ne pas perdre le fil d'une idée à cheval.
+
+    Repli sûr : si le PDF n'offre aucune vraie ligne vide (extraction de
+    mauvaise qualité), tout le texte forme un seul "paragraphe" géant, qui
+    retombe alors sur l'ancien découpage par mots — jamais pire qu'avant,
+    meilleur dès que le document préserve un minimum de structure."""
+    paragraphes = [p.strip() for p in re.split(r"\n\s*\n", texte) if p.strip()]
+    if not paragraphes:
+        return []
+
+    passages = []
+    paragraphes_courants = []
+    mots_courants = 0
+
+    def _finaliser():
+        if paragraphes_courants:
+            passages.append("\n\n".join(paragraphes_courants))
+
+    for paragraphe in paragraphes:
+        nb_mots_paragraphe = len(paragraphe.split())
+
+        if nb_mots_paragraphe > TAILLE_PASSAGE_MOTS:
+            # Paragraphe à lui seul plus gros que la cible (tableau, liste
+            # très longue...) : on referme ce qui précède, puis on retombe
+            # sur l'ancien découpage par mots pour celui-ci uniquement.
+            _finaliser()
+            paragraphes_courants, mots_courants = [], 0
+            passages.extend(_decouper_par_mots(paragraphe))
+            continue
+
+        if mots_courants + nb_mots_paragraphe > TAILLE_PASSAGE_MOTS and paragraphes_courants:
+            _finaliser()
+            paragraphes_courants = [paragraphes_courants[-1]]
+            mots_courants = len(paragraphes_courants[0].split())
+
+        paragraphes_courants.append(paragraphe)
+        mots_courants += nb_mots_paragraphe
+
+    _finaliser()
+    return passages
+
+
+def _decouper_par_mots(texte: str) -> list[str]:
+    """Ancien découpage par nombre de mots fixe — filet de sécurité utilisé
+    uniquement pour un paragraphe à lui seul plus gros que la taille cible
+    d'un passage (voir decouper_en_passages)."""
     mots = texte.split()
     if not mots:
         return []

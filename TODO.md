@@ -309,13 +309,13 @@ reportés consciemment :
    meilleurs résultats même quand rien n'était vraiment pertinent,
    injectant parfois du bruit dans le prompt. Valeur de départ
    raisonnable, à ajuster une fois de vraies données d'usage disponibles.
-3. **Découpage naïf des documents** — ⏳ reporté, mais avec une vraie
-   urgence cachée : le découpage actuel (blocs de mots fixes, sans
-   respecter chapitres/sections) demande, pour être corrigé, de
-   **réindexer tous les documents déjà déposés** (74 Côte d'Ivoire, 14
-   Sénégal à ce jour). Plus on attend, plus il y aura de documents à
-   refaire — à traiter **avant** d'élargir massivement le corpus à
-   d'autres pays, pas après.
+3. **Découpage naïf des documents** — ✅ FAIT le 05/08. Découpage par
+   paragraphes plutôt que par blocs de mots fixes (voir `rag.py`,
+   `decouper_en_passages`) — ne coupe plus un chapitre ou une idée en
+   plein milieu. **Reste à faire** : réindexer les 88 documents déjà
+   déposés (74 Côte d'Ivoire, 14 Sénégal) avec ce nouveau découpage — pas
+   urgent techniquement (l'import en masse permet de relancer facilement
+   les mêmes lots), mais à faire pour qu'ils bénéficient de l'amélioration.
 4. **Pondération des sources** (programme officiel vs contenu
    généré-validé) — reporté, risque de dérive lente jugé faible tant que
    le corpus reste petit et surveillé de près.
