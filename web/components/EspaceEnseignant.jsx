@@ -478,16 +478,13 @@ function BarreNav({ vue, setVue, onDeconnexion, nombreEnAttente, nombreInvitatio
 /*  Écran : Accueil                                                     */
 /* ------------------------------------------------------------------ */
 
-function EcranAccueil({ setVue, enAttente, historique, cours, classes }) {
-  const valides = historique.filter((h) => h.statut === "valide").length;
-  const rejetes = historique.filter((h) => h.statut === "rejete").length;
-
+function EcranAccueil({ setVue, cours }) {
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
+    <div className="max-w-2xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
       <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Bonjour !</h1>
       <p className="text-sm mb-8" style={{ color: C.encreDoux }}>Que veux-tu faire aujourd'hui ?</p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <button
           onClick={() => setVue("deposer-cours")}
           className="eduai-focus text-left rounded-xl p-6 transition-transform hover:-translate-y-0.5"
@@ -499,16 +496,6 @@ function EcranAccueil({ setVue, enAttente, historique, cours, classes }) {
         </button>
 
         <button
-          onClick={() => setVue("mes-classes")}
-          className="eduai-focus text-left rounded-xl p-6 border transition-transform hover:-translate-y-0.5"
-          style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}
-        >
-          <Users size={20} color={C.accentFonce} className="mb-3" />
-          <p className="eduai-display text-lg mb-1" style={{ color: C.encre }}>Mes classes</p>
-          <p className="text-xs" style={{ color: C.encreDoux }}>{classes.length} classe{classes.length !== 1 ? "s" : ""}, notes et absences.</p>
-        </button>
-
-        <button
           onClick={() => setVue("mes-cours")}
           className="eduai-focus text-left rounded-xl p-6 border transition-transform hover:-translate-y-0.5"
           style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}
@@ -517,34 +504,6 @@ function EcranAccueil({ setVue, enAttente, historique, cours, classes }) {
           <p className="eduai-display text-lg mb-1" style={{ color: C.encre }}>Ma banque de cours</p>
           <p className="text-xs" style={{ color: C.encreDoux }}>{cours.length} cours déposés.</p>
         </button>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
-        <CarteStat label="En attente de relecture" valeur={enAttente.length} icon={Clock} accent />
-        <CarteStat label="Validés cette session" valeur={valides} icon={Check} />
-        <CarteStat label="Rejetés cette session" valeur={rejetes} icon={XIcon} />
-      </div>
-
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="eduai-display text-lg" style={{ color: C.encre }}>À relire en priorité</h2>
-        <button onClick={() => setVue("file")} className="eduai-focus text-xs font-medium flex items-center gap-1" style={{ color: C.accentFonce }}>
-          Voir toute la file <ChevronRight size={14} />
-        </button>
-      </div>
-
-      <div className="space-y-3">
-        {enAttente.slice(0, 3).map((ex) => (
-          <div key={ex.id} className="rounded-xl px-5 py-4 flex items-center justify-between border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
-            <div>
-              <p className="text-sm font-semibold" style={{ color: C.encre }}>{ex.theme}</p>
-              <p className="text-xs mt-0.5" style={{ color: C.encreDoux }}>{ex.matiere} · {ex.niveau}</p>
-            </div>
-            <button onClick={() => setVue("file")} className="eduai-focus text-xs font-medium px-3 py-1.5 rounded-full" style={{ backgroundColor: C.bleuFond, color: C.encre }}>
-              Relire
-            </button>
-          </div>
-        ))}
-        {enAttente.length === 0 && <p className="text-sm" style={{ color: C.encreDoux }}>Aucun exercice en attente — tout est à jour.</p>}
       </div>
     </div>
   );
@@ -2597,7 +2556,7 @@ export default function App() {
       ) : (
         <>
           <BarreNav vue={vue} setVue={setVue} onDeconnexion={deconnecter} nombreEnAttente={enAttente.length} nombreInvitations={nombreInvitations} />
-          {vue === "accueil" && <EcranAccueil setVue={setVue} enAttente={enAttente} historique={historique} cours={cours} classes={classes} />}
+          {vue === "accueil" && <EcranAccueil setVue={setVue} cours={cours} />}
 
           {vue === "mes-cours" && <EcranMesCours cours={cours} chargement={chargementCours} erreur={erreurCours} setVue={setVue} setCoursActifId={setCoursActifId} classes={classes} />}
           {vue === "deposer-cours" && <EcranDeposerCours classes={classes} token={token} setVue={setVue} onCoursDepose={onCoursDepose} />}
