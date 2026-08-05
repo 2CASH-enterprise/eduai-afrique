@@ -589,6 +589,19 @@ CREATE INDEX idx_exgl_enseignant ON exercices_generation_libre(enseignant_id);
 CREATE INDEX idx_exgl_statut ON exercices_generation_libre(statut);
 
 -- ============================================================================
+-- ============================================================================
+-- Modules actifs sur le portail public (migration 015) — Admin Plateforme
+-- n'y figure pas : retiré définitivement, pas "en attente d'activation".
+-- ============================================================================
+CREATE TABLE modules_actifs (
+    module      TEXT PRIMARY KEY,
+    actif       BOOLEAN NOT NULL DEFAULT false,
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO modules_actifs (module, actif) VALUES
+    ('eleve', false), ('enseignant', false), ('direction', false),
+    ('parent', false), ('administration', false);
+
 -- Couverture par pays — blocage des inscriptions sans corpus (migration 012)
 -- ============================================================================
 CREATE TABLE pays_couverture (

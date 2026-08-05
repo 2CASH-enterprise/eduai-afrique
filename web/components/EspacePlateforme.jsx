@@ -164,6 +164,7 @@ function BarreNav({ vue, setVue, onDeconnexion }) {
     { id: "documents", label: "Documents" },
     { id: "bibliotheque", label: "Bibliothèque commune" },
     { id: "pays", label: "Pays" },
+    { id: "modules", label: "Modules" },
   ];
   return (
     <div className="sticky top-0 z-10 px-4 sm:px-8 py-3.5 flex items-center justify-between border-b flex-wrap gap-y-2"
@@ -701,6 +702,62 @@ function EcranPays({ token }) {
   );
 }
 
+const LABELS_MODULE = {
+  eleve: "Élève", enseignant: "Enseignant", direction: "Direction",
+  parent: "Parent", administration: "Administration",
+};
+
+function EcranModules({ token }) {
+  const [modules, setModules] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+  const [enCours, setEnCours] = useState(null);
+
+  const charger = useCallback(() => {
+    setChargement(true); setErreur(null);
+    apiFetch("/modules-actifs", { token }).then(setModules).catch((e) => setErreur(e.message)).finally(() => setChargement(false));
+  }, [token]);
+
+  useEffect(() => { charger(); }, [charger]);
+
+  async function basculer(module, actifActuel) {
+    setEnCours(module);
+    try {
+      await apiFetch(`/plateforme/modules/${module}`, { method: "PATCH", token, body: { actif: !actifActuel } });
+      setModules((prev) => prev.map((m) => m.module === module ? { ...m, actif: !actifActuel } : m));
+    } catch (e) { setErreur(e.message); }
+    finally { setEnCours(null); }
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
+      <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Modules</h1>
+      <p className="text-sm mb-8" style={{ color: C.encreDoux }}>
+        Quelles cartes apparaissent sur le portail public (<span className="eduai-mono text-xs">/</span>) — les
+        modules bloqués sont totalement invisibles, pas grisés. Admin Plateforme n'apparaît jamais ici : outil interne
+        retiré définitivement du portail, accessible uniquement par lien direct.
+      </p>
+
+      <BandeauErreur message={erreur} />
+
+      {chargement ? <Chargement /> : (
+        <div className="rounded-2xl border divide-y" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+          {modules.map((m) => (
+            <div key={m.module} className="flex items-center justify-between px-5 py-3.5" style={{ borderColor: C.ligne }}>
+              <span className="text-sm font-medium" style={{ color: C.encre }}>{LABELS_MODULE[m.module] || m.module}</span>
+              <button onClick={() => basculer(m.module, m.actif)} disabled={enCours === m.module}
+                className="eduai-focus rounded-full px-3 py-1 text-xs font-semibold disabled:opacity-60"
+                style={m.actif ? { backgroundColor: C.vertFond, color: C.vert } : { backgroundColor: C.rougeFond, color: C.rouge }}>
+                {enCours === m.module ? <Loader2 size={11} className="eduai-spin" /> : (m.actif ? "Actif" : "Bloqué")}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [token, setToken] = useState(null);
   const [connexionEnCours, setConnexionEnCours] = useState(false);
@@ -733,6 +790,7 @@ export default function App() {
           {vue === "documents" && <EcranDocuments token={token} />}
           {vue === "bibliotheque" && <EcranBibliotheque token={token} />}
           {vue === "pays" && <EcranPays token={token} />}
+          {vue === "modules" && <EcranModules token={token} />}
         </>
       )}
     </div>

@@ -258,6 +258,89 @@ de formule (upgrade/downgrade — qui déclenche ça, l'Admin Plateforme ?).
 
 ---
 
+## 23. Modules actifs sur le portail public — ✅ FAIT le 05/08
+
+**Discuté et cadré le 05/08**, en préparation du lancement en test ouvert
+du seul module Enseignant : les cartes des modules pas encore ouverts
+(Élève, Direction, Parent, Administration) ne devaient plus apparaître sur
+la page d'accueil publique.
+
+**Deux décisions distinctes, pas une seule** :
+- **Cartes "en attente d'activation"** (Élève, Direction, Parent,
+  Administration) → **Option A retenue** : complètement invisibles, pas
+  grisées avec "Bientôt disponible" — plus propre, aucune ambiguïté.
+  Géré par un vrai interrupteur, activable un jour sans redéploiement.
+- **Admin Plateforme** → traitement différent, volontairement pas dans le
+  même système : ce n'est pas un module "pas encore prêt", c'est un outil
+  interne à l'équipe, **retiré définitivement** du portail public — plus
+  jamais une carte, accessible uniquement par lien direct (`/plateforme`).
+  Précision importante : ça ne change rien à la sécurité en soi (l'écran
+  de connexion reste protégé par les vrais identifiants) — c'est une
+  question de discrétion, pas une mesure de sécurité.
+
+**Construit et déployé** : table `modules_actifs` (migration 015, seul
+Enseignant actif au lancement), endpoint public `GET /modules-actifs`
+(sans authentification — nécessaire puisque la page d'accueil doit savoir
+quoi afficher **avant** toute connexion, ne révèle rien de sensible),
+`PATCH /plateforme/modules/{module}` protégé (Admin Plateforme
+uniquement), écran "Modules" dédié (bascule actif/bloqué, même principe
+que l'écran "Pays"). Page d'accueil (`web/app/page.jsx`) convertie en
+composant serveur qui récupère l'état des modules à chaque requête
+(revalidation automatique toutes les 60 secondes), avec repli sûr
+(Enseignant seul) si l'API est injoignable — jamais une page blanche.
+
+---
+
+## 22. Renforcement du RAG — discuté le 04/08, deux points faits, trois reportés
+
+**Réflexion menée le 04/08** sur cinq leviers pour rendre le RAG plus
+puissant. Deux corrigés immédiatement (coût faible, impact réel), trois
+reportés consciemment :
+
+1. **Requête de recherche enrichie** — ✅ FAIT. La recherche ne se basait
+   que sur "matière + niveau + titre du cours" ; elle utilise désormais
+   aussi le contenu réel rédigé par l'enseignant (tronqué à 800
+   caractères), un signal bien plus riche pour cibler le bon passage du
+   corpus. Concerne `generation_cours.py` ("Déposer un cours" uniquement —
+   Génération libre n'a pas d'équivalent "contenu réel", son thème reste
+   son meilleur signal disponible).
+2. **Seuil de pertinence minimum** — ✅ FAIT. `SEUIL_SIMILARITE_MINIMUM =
+   0.3` dans `rag.py` — avant, la recherche renvoyait toujours ses k
+   meilleurs résultats même quand rien n'était vraiment pertinent,
+   injectant parfois du bruit dans le prompt. Valeur de départ
+   raisonnable, à ajuster une fois de vraies données d'usage disponibles.
+3. **Découpage naïf des documents** — ⏳ reporté, mais avec une vraie
+   urgence cachée : le découpage actuel (blocs de mots fixes, sans
+   respecter chapitres/sections) demande, pour être corrigé, de
+   **réindexer tous les documents déjà déposés** (74 Côte d'Ivoire, 14
+   Sénégal à ce jour). Plus on attend, plus il y aura de documents à
+   refaire — à traiter **avant** d'élargir massivement le corpus à
+   d'autres pays, pas après.
+4. **Pondération des sources** (programme officiel vs contenu
+   généré-validé) — reporté, risque de dérive lente jugé faible tant que
+   le corpus reste petit et surveillé de près.
+5. **Mesure de la qualité du RAG** — reporté. Aucun moyen aujourd'hui de
+   savoir objectivement si le RAG aide réellement les générations.
+   Construire un système de mesure sans données réelles d'usage serait
+   prématuré — à revoir une fois de vrais enseignants actifs sur la
+   plateforme.
+
+---
+
+## 21. Chat contextuel enseignant — envisagé puis abandonné le 04/08
+
+**Idée discutée** : un champ de chat dans le module Enseignant, permettant
+de dialoguer avec l'IA ancrée dans le contexte précis (programme, pays,
+chapitre/exercice enseigné), en s'appuyant sur le RAG déjà en place. Trois
+points restaient à trancher (chat général vs contextuel à un cours,
+sauvegarde ou non de l'historique, et surtout la question du coût — un
+chat s'utilise bien plus intensément qu'une génération ponctuelle,
+tension avec la gratuité volontaire de Génération libre).
+
+**Décision : abandonné**, aucune suite prévue.
+
+---
+
 ## 20. Stratégie économique clarifiée + geste "Suggérer EduAI à mon établissement"
 
 **Discuté le 04/08**, éclaire enfin pourquoi le module Enseignant a été

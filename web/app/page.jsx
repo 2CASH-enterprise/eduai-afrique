@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { GraduationCap, BookOpen, ClipboardCheck, BarChart3, Users, Building2, Globe } from "lucide-react";
+import { GraduationCap, BookOpen, ClipboardCheck, BarChart3, Users, Building2 } from "lucide-react";
 
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
@@ -18,16 +18,35 @@ const C = {
   accentFonce: "#8F7140",
 };
 
+// Admin Plateforme n'apparaît volontairement jamais ici — outil interne
+// pour l'équipe, retiré définitivement du portail public (accessible par
+// URL directe uniquement), pas "en attente d'activation" comme les autres
+// (voir TODO.md, discuté le 05/08).
 const ESPACES = [
-  { href: "/eleve", label: "Élève", desc: "Exercices, corrigés, résultats", icon: BookOpen },
-  { href: "/enseignant", label: "Enseignant", desc: "Cours, classes, validation", icon: ClipboardCheck },
-  { href: "/direction", label: "Direction", desc: "Tableau de bord, pilotage", icon: BarChart3 },
-  { href: "/parent", label: "Parent", desc: "Suivi scolaire de l'enfant", icon: Users },
-  { href: "/administration", label: "Administration", desc: "Comptes, bulletins, paiements", icon: Building2 },
-  { href: "/plateforme", label: "Admin Plateforme", desc: "Établissements, documents partagés", icon: Globe },
+  { module: "eleve", href: "/eleve", label: "Élève", desc: "Exercices, corrigés, résultats", icon: BookOpen },
+  { module: "enseignant", href: "/enseignant", label: "Enseignant", desc: "Cours, classes, validation", icon: ClipboardCheck },
+  { module: "direction", href: "/direction", label: "Direction", desc: "Tableau de bord, pilotage", icon: BarChart3 },
+  { module: "parent", href: "/parent", label: "Parent", desc: "Suivi scolaire de l'enfant", icon: Users },
+  { module: "administration", href: "/administration", label: "Administration", desc: "Comptes, bulletins, paiements", icon: Building2 },
 ];
 
-export default function Accueil() {
+const API_BASE_URL = "http://89.116.111.3:8000";
+
+async function chargerModulesActifs() {
+  try {
+    const reponse = await fetch(`${API_BASE_URL}/modules-actifs`, { next: { revalidate: 60 } });
+    if (!reponse.ok) return new Set(["enseignant"]); // repli sûr si l'API est indisponible
+    const donnees = await reponse.json();
+    return new Set(donnees.filter((m) => m.actif).map((m) => m.module));
+  } catch {
+    return new Set(["enseignant"]); // repli sûr — jamais une page blanche si l'API est injoignable
+  }
+}
+
+export default async function Accueil() {
+  const modulesActifs = await chargerModulesActifs();
+  const espacesVisibles = ESPACES.filter((e) => modulesActifs.has(e.module));
+
   return (
     <div className="eduai-root min-h-screen flex items-center justify-center px-6 py-16" style={{ backgroundColor: C.fond }}>
       <style>{STYLES}</style>
@@ -42,8 +61,8 @@ export default function Accueil() {
           Choisissez votre espace pour vous connecter.
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {ESPACES.map((e) => (
+        <div className={`grid grid-cols-1 ${espacesVisibles.length > 1 ? "sm:grid-cols-2" : ""} gap-4`}>
+          {espacesVisibles.map((e) => (
             <Link
               key={e.href}
               href={e.href}
