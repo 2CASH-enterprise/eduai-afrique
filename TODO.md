@@ -258,42 +258,6 @@ de formule (upgrade/downgrade — qui déclenche ça, l'Admin Plateforme ?).
 
 ---
 
-## 22. Renforcement du RAG — discuté le 04/08, deux points faits, trois reportés
-
-**Réflexion menée le 04/08** sur cinq leviers pour rendre le RAG plus
-puissant. Deux corrigés immédiatement (coût faible, impact réel), trois
-reportés consciemment :
-
-1. **Requête de recherche enrichie** — ✅ FAIT. La recherche ne se basait
-   que sur "matière + niveau + titre du cours" ; elle utilise désormais
-   aussi le contenu réel rédigé par l'enseignant (tronqué à 800
-   caractères), un signal bien plus riche pour cibler le bon passage du
-   corpus. Concerne `generation_cours.py` ("Déposer un cours" uniquement —
-   Génération libre n'a pas d'équivalent "contenu réel", son thème reste
-   son meilleur signal disponible).
-2. **Seuil de pertinence minimum** — ✅ FAIT. `SEUIL_SIMILARITE_MINIMUM =
-   0.3` dans `rag.py` — avant, la recherche renvoyait toujours ses k
-   meilleurs résultats même quand rien n'était vraiment pertinent,
-   injectant parfois du bruit dans le prompt. Valeur de départ
-   raisonnable, à ajuster une fois de vraies données d'usage disponibles.
-3. **Découpage naïf des documents** — ⏳ reporté, mais avec une vraie
-   urgence cachée : le découpage actuel (blocs de mots fixes, sans
-   respecter chapitres/sections) demande, pour être corrigé, de
-   **réindexer tous les documents déjà déposés** (74 Côte d'Ivoire, 14
-   Sénégal à ce jour). Plus on attend, plus il y aura de documents à
-   refaire — à traiter **avant** d'élargir massivement le corpus à
-   d'autres pays, pas après.
-4. **Pondération des sources** (programme officiel vs contenu
-   généré-validé) — reporté, risque de dérive lente jugé faible tant que
-   le corpus reste petit et surveillé de près.
-5. **Mesure de la qualité du RAG** — reporté. Aucun moyen aujourd'hui de
-   savoir objectivement si le RAG aide réellement les générations.
-   Construire un système de mesure sans données réelles d'usage serait
-   prématuré — à revoir une fois de vrais enseignants actifs sur la
-   plateforme.
-
----
-
 ## 21. Chat contextuel enseignant — envisagé puis abandonné le 04/08
 
 **Idée discutée** : un champ de chat dans le module Enseignant, permettant
