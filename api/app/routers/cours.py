@@ -27,7 +27,7 @@ def _entete_telechargement(nom_fichier: str) -> dict:
     nom_encode = urllib.parse.quote(nom_fichier)
     return {"Content-Disposition": f"attachment; filename=\"{nom_ascii}\"; filename*=UTF-8''{nom_encode}"}
 
-TYPES_RESSOURCE = ["fiche_pedagogique", "resume", "exercices", "qcm", "devoir", "controle"]
+TYPES_RESSOURCE = ["fiche_pedagogique", "resume", "qcm", "exercices", "devoir", "controle"]
 
 LABELS_RESSOURCE = {
     "fiche_pedagogique": "Fiche pédagogique",
@@ -186,12 +186,15 @@ def detail_cours(cours_id: str, enseignant: EnseignantConnecte = Depends(get_ens
 
         cur.execute(
             "SELECT id, type_ressource, contenu, statut FROM ressources_generees WHERE cours_id = %s "
-            "AND statut != 'supprime' ORDER BY type_ressource",
+            "AND statut != 'supprime'",
             (cours_id,),
         )
-        ressources = [{"id": str(r_id), "type_ressource": r_type, "label": LABELS_RESSOURCE[r_type],
-                       "contenu": r_contenu, "statut": r_statut}
-                      for r_id, r_type, r_contenu, r_statut in cur.fetchall()]
+        ressources = sorted(
+            ({"id": str(r_id), "type_ressource": r_type, "label": LABELS_RESSOURCE[r_type],
+              "contenu": r_contenu, "statut": r_statut}
+             for r_id, r_type, r_contenu, r_statut in cur.fetchall()),
+            key=lambda r: TYPES_RESSOURCE.index(r["type_ressource"]) if r["type_ressource"] in TYPES_RESSOURCE else 99,
+        )
 
     return CoursDetail(id=str(cours_id_v), titre=titre, matiere=matiere_nom, classe=classe_nom,
                         contenu_texte=contenu_texte, created_at=created_at,
@@ -377,9 +380,12 @@ def exporter_cours_pdf(cours_id: str, enseignant: EnseignantConnecte = Depends(g
     """TODO.md point 19.1 — toutes les ressources d'un cours dans un seul PDF."""
     with get_cursor() as cur:
         (_, titre_cours, _, _, matiere_nom, classe_nom, *_rest) = _verifier_cours_du_enseignant(cur, cours_id, enseignant.id)
-        cur.execute("SELECT type_ressource, contenu FROM ressources_generees WHERE cours_id = %s AND statut != 'supprime' ORDER BY type_ressource",
+        cur.execute("SELECT type_ressource, contenu FROM ressources_generees WHERE cours_id = %s AND statut != 'supprime'",
                     (cours_id,))
-        ressources = [{"type_ressource": t, "label": LABELS_RESSOURCE[t], "contenu": c} for t, c in cur.fetchall()]
+        ressources = sorted(
+            ({"type_ressource": t, "label": LABELS_RESSOURCE[t], "contenu": c} for t, c in cur.fetchall()),
+            key=lambda r: TYPES_RESSOURCE.index(r["type_ressource"]) if r["type_ressource"] in TYPES_RESSOURCE else 99,
+        )
         if not ressources:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Aucune ressource à exporter")
 

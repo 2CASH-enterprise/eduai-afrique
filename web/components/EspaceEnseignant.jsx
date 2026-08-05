@@ -110,8 +110,8 @@ const TYPE_EVALUATION_LABEL = { controle: "Contrôle", devoir: "Devoir", examen:
 const TYPES_RESSOURCE = [
   { key: "fiche_pedagogique", label: "Fiche pédagogique", icon: BookMarked },
   { key: "resume", label: "Résumé", icon: FileText },
-  { key: "exercices", label: "Exercices", icon: ListChecks },
   { key: "qcm", label: "QCM", icon: HelpCircle },
+  { key: "exercices", label: "Exercices", icon: ListChecks },
   { key: "devoir", label: "Devoir", icon: NotebookPen },
   { key: "controle", label: "Contrôle", icon: ScrollText },
 ];
