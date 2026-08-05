@@ -11,7 +11,7 @@ from ..schemas import (AdminPlateformeConnecte, DocumentPedagogique, PassageRech
                         EtablissementResume, CreationEtablissement, EtablissementCree, CompteCree,
                         ExerciceBiblioCommune, LigneImportDocument, DemandeImportDocuments,
                         ResultatLigneImportDocument, RapportImportDocuments,
-                        PaysCouverture, ModificationPaysCouverture)
+                        PaysCouverture, ModificationPaysCouverture, EnseignantResume)
 
 router = APIRouter(prefix="/plateforme", tags=["admin-plateforme"])
 
@@ -353,3 +353,27 @@ def lister_liste_attente(admin: AdminPlateformeConnecte = Depends(get_admin_plat
         )
         lignes = cur.fetchall()
     return [{"email": e, "pays": p, "role": r, "created_at": c.isoformat()} for e, p, r, c in lignes]
+
+
+@router.get("/enseignants", response_model=list[EnseignantResume])
+def lister_enseignants(admin: AdminPlateformeConnecte = Depends(get_admin_plateforme_connecte)):
+    """Vue d'ensemble de tous les comptes enseignants réels (actifs ou
+    désactivés) — à compléter côté frontend avec /plateforme/liste-attente
+    (ceux qui n'ont PAS de compte, bloqués par la couverture de leur pays,
+    voir migration 012) pour une vue complète : actif / inactif / en attente."""
+    with get_cursor() as cur:
+        cur.execute(
+            """
+            SELECT u.id, u.email, u.nom, u.prenom, COALESCE(e.pays, u.pays), e.nom, u.actif, u.created_at
+            FROM utilisateurs u
+            LEFT JOIN etablissements e ON e.id = u.etablissement_id
+            WHERE u.role = 'enseignant' AND u.deleted_at IS NULL
+            ORDER BY u.created_at DESC
+            """
+        )
+        lignes = cur.fetchall()
+    return [
+        EnseignantResume(id=str(id_), email=email, nom=nom, prenom=prenom,
+                           pays=pays, etablissement_nom=etab_nom, actif=actif, created_at=created_at)
+        for id_, email, nom, prenom, pays, etab_nom, actif, created_at in lignes
+    ]

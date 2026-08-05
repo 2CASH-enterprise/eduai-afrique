@@ -619,6 +619,17 @@ class EtablissementResume(BaseModel):
     nombre_eleves: int
 
 
+class EnseignantResume(BaseModel):
+    id: str
+    email: str
+    nom: str
+    prenom: str
+    pays: str | None
+    etablissement_nom: str | None  # null = enseignant indépendant
+    actif: bool
+    created_at: datetime
+
+
 class CreationEtablissement(BaseModel):
     nom: str
     pays: str

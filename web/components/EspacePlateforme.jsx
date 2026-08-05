@@ -165,6 +165,7 @@ function BarreNav({ vue, setVue, onDeconnexion }) {
     { id: "bibliotheque", label: "Bibliothèque commune" },
     { id: "pays", label: "Pays" },
     { id: "modules", label: "Modules" },
+    { id: "enseignants", label: "Enseignants" },
   ];
   return (
     <div className="sticky top-0 z-10 px-4 sm:px-8 py-3.5 flex items-center justify-between border-b flex-wrap gap-y-2"
@@ -758,6 +759,94 @@ function EcranModules({ token }) {
   );
 }
 
+function EcranEnseignants({ token }) {
+  const [enseignants, setEnseignants] = useState([]);
+  const [listeAttente, setListeAttente] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+  const [filtre, setFiltre] = useState("tous"); // tous | actifs | inactifs | en_attente
+
+  useEffect(() => {
+    setChargement(true); setErreur(null);
+    Promise.all([
+      apiFetch("/plateforme/enseignants", { token }),
+      apiFetch("/plateforme/liste-attente", { token }),
+    ]).then(([e, l]) => { setEnseignants(e); setListeAttente(l.filter((x) => x.role === "enseignant")); })
+      .catch((err) => setErreur(err.message)).finally(() => setChargement(false));
+  }, [token]);
+
+  const actifs = enseignants.filter((e) => e.actif);
+  const inactifs = enseignants.filter((e) => !e.actif);
+
+  const lignesAffichees =
+    filtre === "actifs" ? actifs.map((e) => ({ ...e, statutAffiche: "actif" })) :
+    filtre === "inactifs" ? inactifs.map((e) => ({ ...e, statutAffiche: "inactif" })) :
+    filtre === "en_attente" ? listeAttente.map((e) => ({ ...e, statutAffiche: "en_attente" })) :
+    [
+      ...enseignants.map((e) => ({ ...e, statutAffiche: e.actif ? "actif" : "inactif" })),
+      ...listeAttente.map((e) => ({ ...e, statutAffiche: "en_attente" })),
+    ];
+
+  const badgeStatut = {
+    actif: { label: "Actif", bg: C.vertFond, fg: C.vert },
+    inactif: { label: "Inactif", bg: C.rougeFond, fg: C.rouge },
+    en_attente: { label: "En attente (pays non couvert)", bg: C.ambreFond, fg: C.ambre },
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
+      <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Enseignants</h1>
+      <p className="text-sm mb-6" style={{ color: C.encreDoux }}>
+        {enseignants.length} compte{enseignants.length !== 1 ? "s" : ""} ({actifs.length} actif{actifs.length !== 1 ? "s" : ""},{" "}
+        {inactifs.length} inactif{inactifs.length !== 1 ? "s" : ""}) · {listeAttente.length} en attente d'un pays non couvert.
+      </p>
+
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {[
+          { id: "tous", label: "Tous" },
+          { id: "actifs", label: `Actifs (${actifs.length})` },
+          { id: "inactifs", label: `Inactifs (${inactifs.length})` },
+          { id: "en_attente", label: `En attente (${listeAttente.length})` },
+        ].map((f) => (
+          <button key={f.id} onClick={() => setFiltre(f.id)}
+            className="eduai-focus rounded-full px-3 py-1.5 text-xs font-medium border"
+            style={filtre === f.id ? { backgroundColor: C.encre, color: C.surface, borderColor: C.encre } : { borderColor: C.ligne, color: C.encreDoux }}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <BandeauErreur message={erreur} />
+
+      {chargement ? <Chargement /> : (
+        <div className="rounded-2xl border divide-y" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+          {lignesAffichees.map((e, i) => (
+            <div key={e.id || `${e.email}-${i}`} className="flex items-center justify-between px-5 py-3.5">
+              <div>
+                <p className="text-sm font-medium" style={{ color: C.encre }}>
+                  {e.prenom ? `${e.prenom} ${e.nom}` : e.email}
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: C.encreAttenue }}>
+                  {e.prenom ? `${e.email} · ` : ""}
+                  {e.pays || "Pays non renseigné"}
+                  {e.etablissement_nom ? ` · ${e.etablissement_nom}` : e.statutAffiche !== "en_attente" ? " · Indépendant" : ""}
+                </p>
+              </div>
+              <span className="eduai-mono text-[10px] px-2 py-0.5 rounded-full flex-shrink-0 text-center"
+                style={{ backgroundColor: badgeStatut[e.statutAffiche].bg, color: badgeStatut[e.statutAffiche].fg }}>
+                {badgeStatut[e.statutAffiche].label}
+              </span>
+            </div>
+          ))}
+          {lignesAffichees.length === 0 && (
+            <p className="text-sm text-center py-8" style={{ color: C.encreDoux }}>Aucun enseignant dans cette catégorie.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [token, setToken] = useState(null);
   const [connexionEnCours, setConnexionEnCours] = useState(false);
@@ -791,6 +880,7 @@ export default function App() {
           {vue === "bibliotheque" && <EcranBibliotheque token={token} />}
           {vue === "pays" && <EcranPays token={token} />}
           {vue === "modules" && <EcranModules token={token} />}
+          {vue === "enseignants" && <EcranEnseignants token={token} />}
         </>
       )}
     </div>
