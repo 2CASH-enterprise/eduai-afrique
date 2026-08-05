@@ -258,6 +258,79 @@ de formule (upgrade/downgrade — qui déclenche ça, l'Admin Plateforme ?).
 
 ---
 
+## 22. Renforcement du RAG — discuté le 04/08, deux points faits, trois reportés
+
+**Réflexion menée le 04/08** sur cinq leviers pour rendre le RAG plus
+puissant. Deux corrigés immédiatement (coût faible, impact réel), trois
+reportés consciemment :
+
+1. **Requête de recherche enrichie** — ✅ FAIT. La recherche ne se basait
+   que sur "matière + niveau + titre du cours" ; elle utilise désormais
+   aussi le contenu réel rédigé par l'enseignant (tronqué à 800
+   caractères), un signal bien plus riche pour cibler le bon passage du
+   corpus. Concerne `generation_cours.py` ("Déposer un cours" uniquement —
+   Génération libre n'a pas d'équivalent "contenu réel", son thème reste
+   son meilleur signal disponible).
+2. **Seuil de pertinence minimum** — ✅ FAIT. `SEUIL_SIMILARITE_MINIMUM =
+   0.3` dans `rag.py` — avant, la recherche renvoyait toujours ses k
+   meilleurs résultats même quand rien n'était vraiment pertinent,
+   injectant parfois du bruit dans le prompt. Valeur de départ
+   raisonnable, à ajuster une fois de vraies données d'usage disponibles.
+3. **Découpage naïf des documents** — ⏳ reporté, mais avec une vraie
+   urgence cachée : le découpage actuel (blocs de mots fixes, sans
+   respecter chapitres/sections) demande, pour être corrigé, de
+   **réindexer tous les documents déjà déposés** (74 Côte d'Ivoire, 14
+   Sénégal à ce jour). Plus on attend, plus il y aura de documents à
+   refaire — à traiter **avant** d'élargir massivement le corpus à
+   d'autres pays, pas après.
+4. **Pondération des sources** (programme officiel vs contenu
+   généré-validé) — reporté, risque de dérive lente jugé faible tant que
+   le corpus reste petit et surveillé de près.
+5. **Mesure de la qualité du RAG** — reporté. Aucun moyen aujourd'hui de
+   savoir objectivement si le RAG aide réellement les générations.
+   Construire un système de mesure sans données réelles d'usage serait
+   prématuré — à revoir une fois de vrais enseignants actifs sur la
+   plateforme.
+
+---
+
+## 21. Chat contextuel enseignant — envisagé puis abandonné le 04/08
+
+**Idée discutée** : un champ de chat dans le module Enseignant, permettant
+de dialoguer avec l'IA ancrée dans le contexte précis (programme, pays,
+chapitre/exercice enseigné), en s'appuyant sur le RAG déjà en place. Trois
+points restaient à trancher (chat général vs contextuel à un cours,
+sauvegarde ou non de l'historique, et surtout la question du coût — un
+chat s'utilise bien plus intensément qu'une génération ponctuelle,
+tension avec la gratuité volontaire de Génération libre).
+
+**Décision : abandonné**, aucune suite prévue.
+
+---
+
+## 20. Stratégie économique clarifiée + geste "Suggérer EduAI à mon établissement"
+
+**Discuté le 04/08**, éclaire enfin pourquoi le module Enseignant a été
+construit avec une gratuité aussi généreuse (Génération libre toujours
+gratuite, 3 mois totalement libres même pour "Déposer un cours") : ce
+n'est pas qu'une décision produit isolée, c'est une **stratégie
+d'acquisition délibérée**. Le modèle économique final : seuls les
+**établissements** (abonnement, point 12) et les **parents** (upgrade du
+compte élève, point 13) paient — les enseignants sont l'entonnoir gratuit
+qui fait connaître la plateforme.
+
+**Manque identifié** : aujourd'hui, rien ne permet à un enseignant
+satisfait de faire remonter son intérêt pour que son établissement
+rejoigne la plateforme — l'onboarding d'un établissement passe uniquement
+par l'Admin Plateforme, pas par l'enseignant.
+
+**Décision** : ne rien construire tout de suite. **Revenir sur ce point
+une fois la barre des 300 enseignants inscrits atteinte** — un simple
+geste "Suggérer EduAI à mon établissement" (pas un onboarding
+self-service complet), qui envoie un signal côté équipe.
+
+---
+
 ## 19. Manques identifiés sur le module Enseignant — discuté le 04/08
 
 **Bilan fait le 04/08** avant le lancement en test ouvert. Sept points

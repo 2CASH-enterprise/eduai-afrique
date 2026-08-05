@@ -117,16 +117,25 @@ def _structure_valide(type_ressource: str, donnees) -> bool:
 
 
 
-def _rechercher_contexte(matiere_nom: str, niveau_nom: str, titre_cours: str,
+def _rechercher_contexte(matiere_nom: str, niveau_nom: str, titre_cours: str, contenu_texte: str | None,
                           niveau_id: str | None, matiere_id: str | None,
                           etablissement_id: str | None, enseignant_id: str, pays: str | None) -> list[str]:
     """Best-effort : une panne d'indexation ou d'embedding ne doit jamais
-    empêcher la génération elle-même — juste la priver de contexte enrichi."""
+    empêcher la génération elle-même — juste la priver de contexte enrichi.
+
+    Réflexion du 04/08 : la requête se limitait avant à "matière niveau
+    titre" — quelques mots, souvent trop pauvres pour bien cibler le
+    corpus. Le contenu réellement enseigné (rédigé par l'enseignant dans
+    "Contenu du cours") est un bien meilleur signal — on l'inclut
+    désormais dans la requête elle-même, pas seulement dans le prompt final."""
     try:
         client = rag.obtenir_client_mistral()
         if client is None:
             return []
-        embedding = rag.generer_embeddings(client, [f"{matiere_nom} {niveau_nom} {titre_cours}"])[0]
+        texte_requete = f"{matiere_nom} {niveau_nom} {titre_cours}"
+        if contenu_texte:
+            texte_requete += " " + contenu_texte[:800]  # tronqué : signal suffisant, évite une requête trop longue
+        embedding = rag.generer_embeddings(client, [texte_requete])[0]
         with get_cursor() as cur:
             return rag.rechercher_passages_pertinents(
                 cur, embedding, niveau_id=niveau_id, matiere_id=matiere_id,
@@ -148,7 +157,7 @@ def generer_ressource(type_ressource: str, titre_cours: str, contenu_texte: str 
                        niveau_id: str | None, matiere_id: str | None,
                        etablissement_id: str | None, enseignant_id: str, pays: str | None = None,
                        difficulte: str = "moyen") -> dict:
-    passages = _rechercher_contexte(matiere_nom, niveau_nom, titre_cours,
+    passages = _rechercher_contexte(matiere_nom, niveau_nom, titre_cours, contenu_texte,
                                       niveau_id, matiere_id, etablissement_id, enseignant_id, pays)
 
     schema_exemple = json.dumps(SCHEMAS_PAR_TYPE[type_ressource], ensure_ascii=False, indent=2)

@@ -170,12 +170,23 @@ def _indexer_texte_direct(document_id: str, texte: str) -> None:
             )
 
 
+SEUIL_SIMILARITE_MINIMUM = 0.3
+# Réflexion du 04/08 : sans seuil, la recherche renvoyait toujours ses k
+# meilleurs résultats même quand rien n'était vraiment pertinent — comme
+# chercher "le moins pire" plutôt que "vraiment utile". En dessous de ce
+# seuil, mieux vaut ne rien injecter dans le prompt (l'IA génère alors
+# sans enrichissement, comme avant l'existence du corpus) que d'injecter
+# du bruit. Valeur de départ raisonnable, à ajuster une fois de vraies
+# données d'usage disponibles (voir TODO.md — mesure de la qualité du RAG,
+# volontairement pas construite tout de suite).
+
+
 def rechercher_passages_pertinents(cur, requete_embedding: list[float],
                                      niveau_id: str | None = None, matiere_id: str | None = None,
                                      etablissement_id: str | None = None,
                                      utilisateur_id_demandeur: str | None = None,
                                      pays: str | None = None,
-                                     k: int = 5) -> list[str]:
+                                     k: int = 5, seuil_similarite: float = SEUIL_SIMILARITE_MINIMUM) -> list[str]:
     """Fonction de récupération RAG — PAS un endpoint public. Combine trois
     sources selon les règles de partage retenues :
       - programme_officiel et genere_valide (etablissement_id NULL) :
@@ -209,12 +220,14 @@ def rechercher_passages_pertinents(cur, requete_embedding: list[float],
                     )
                 )
               )
+          AND 1 - (p.embedding <=> %s::vector) >= %s
         ORDER BY p.embedding <=> %s::vector
         LIMIT %s
         """,
         (niveau_id, niveau_id, matiere_id, matiere_id,
          pays, pays,
          etablissement_id, utilisateur_id_demandeur, utilisateur_id_demandeur,
+         vers_pgvector(requete_embedding), seuil_similarite,
          vers_pgvector(requete_embedding), k),
     )
     return [row[0] for row in cur.fetchall()]
