@@ -7,7 +7,7 @@ import {
   Calculator, FlaskConical, Leaf, Landmark, Languages, Clock, History,
   FileText, Wand2, Sparkles, Trash2, Plus, BookMarked,
   ListChecks, HelpCircle, NotebookPen, ScrollText, Loader2,
-  Users, TrendingUp, CalendarX, AlertTriangle, Upload, Share2, UserPlus,
+  Users, TrendingUp, CalendarX, AlertTriangle, Upload, Share2, UserPlus, Menu,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -382,6 +382,7 @@ function EcranConnexion({ onConnexion, onInscription, connexionEnCours, erreurCo
 /* ------------------------------------------------------------------ */
 
 function BarreNav({ vue, setVue, onDeconnexion, nombreEnAttente, nombreInvitations }) {
+  const [menuOuvert, setMenuOuvert] = useState(false);
   const items = [
     { id: "accueil", label: "Accueil" },
     { id: "mes-cours", label: "Mes cours" },
@@ -393,45 +394,83 @@ function BarreNav({ vue, setVue, onDeconnexion, nombreEnAttente, nombreInvitatio
     { id: "file", label: "À valider", badge: nombreEnAttente },
     { id: "historique", label: "Historique de validation" },
   ];
+
+  function choisir(id) {
+    setVue(id);
+    setMenuOuvert(false);
+  }
+
   return (
     <div
-      className="sticky top-0 z-10 px-4 sm:px-8 py-3.5 flex items-center justify-between border-b flex-wrap gap-y-2"
+      className="sticky top-0 z-10 px-4 sm:px-8 py-3.5 border-b"
       style={{ backgroundColor: "rgba(250,248,243,0.92)", backdropFilter: "blur(6px)", borderColor: C.ligne }}
     >
-      <button onClick={() => setVue("accueil")} className="eduai-focus flex items-center gap-2">
-        <GraduationCap size={20} color={C.encre} strokeWidth={1.75} />
-        <span className="eduai-display text-base hidden sm:inline" style={{ color: C.encre }}>ÉduAI Afrique</span>
-      </button>
+      <div className="flex items-center justify-between">
+        <button onClick={() => choisir("accueil")} className="eduai-focus flex items-center gap-2">
+          <GraduationCap size={20} color={C.encre} strokeWidth={1.75} />
+          <span className="eduai-display text-base hidden sm:inline" style={{ color: C.encre }}>ÉduAI Afrique</span>
+        </button>
 
-      <nav className="flex items-center gap-4 overflow-x-auto">
-        {items.map((it) => (
-          <button
-            key={it.id}
-            onClick={() => setVue(it.id)}
-            className="eduai-focus relative pb-1 text-xs font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap"
-            style={{ color: vue === it.id ? C.encre : C.encreAttenue }}
-          >
-            {it.label}
-            {!!it.badge && (
-              <span className="eduai-mono text-[10px] px-1.5 rounded-full" style={{ backgroundColor: C.rougeFond, color: C.rouge }}>
-                {it.badge}
-              </span>
-            )}
-            {vue === it.id && <span className="absolute left-0 right-0 -bottom-[15px] h-[2px]" style={{ backgroundColor: C.accent }} />}
+        {/* Navigation horizontale — écrans larges uniquement */}
+        <nav className="hidden md:flex items-center gap-4 overflow-x-auto">
+          {items.map((it) => (
+            <button
+              key={it.id}
+              onClick={() => choisir(it.id)}
+              className="eduai-focus relative pb-1 text-xs font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap"
+              style={{ color: vue === it.id ? C.encre : C.encreAttenue }}
+            >
+              {it.label}
+              {!!it.badge && (
+                <span className="eduai-mono text-[10px] px-1.5 rounded-full" style={{ backgroundColor: C.rougeFond, color: C.rouge }}>
+                  {it.badge}
+                </span>
+              )}
+              {vue === it.id && <span className="absolute left-0 right-0 -bottom-[15px] h-[2px]" style={{ backgroundColor: C.accent }} />}
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex items-center gap-4">
+          <button className="eduai-focus relative hidden sm:inline-flex" aria-label="Notifications">
+            <Bell size={17} color={C.encreDoux} />
           </button>
-        ))}
-      </nav>
+          <button onClick={onDeconnexion} className="eduai-focus hidden md:flex items-center gap-1.5 text-xs font-medium" style={{ color: C.encreDoux }}>
+            <LogOut size={14} />
+            <span className="hidden sm:inline">Déconnexion</span>
+          </button>
 
-      <div className="flex items-center gap-4">
-        <button className="eduai-focus relative" aria-label="Notifications">
-          <Bell size={17} color={C.encreDoux} />
-        </button>
-        <button onClick={onDeconnexion} className="eduai-focus flex items-center gap-1.5 text-xs font-medium" style={{ color: C.encreDoux }}>
-          <LogOut size={14} />
-          <span className="hidden sm:inline">Déconnexion</span>
-        </button>
+          {/* Bouton hamburger — écrans étroits uniquement */}
+          <button onClick={() => setMenuOuvert((o) => !o)} className="eduai-focus md:hidden" aria-label="Menu">
+            {menuOuvert ? <XIcon size={20} color={C.encre} /> : <Menu size={20} color={C.encre} />}
+          </button>
+        </div>
       </div>
-    </div>
+
+      {/* Menu déroulant — écrans étroits uniquement */}
+      {menuOuvert && (
+        <nav className="md:hidden mt-3.5 pt-3.5 border-t flex flex-col gap-0.5" style={{ borderColor: C.ligne }}>
+          {items.map((it) => (
+            <button
+              key={it.id}
+              onClick={() => choisir(it.id)}
+              className="eduai-focus flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium text-left"
+              style={{ color: vue === it.id ? C.encre : C.encreDoux, backgroundColor: vue === it.id ? C.bleuFond : "transparent" }}
+            >
+              {it.label}
+              {!!it.badge && (
+                <span className="eduai-mono text-[10px] px-1.5 rounded-full" style={{ backgroundColor: C.rougeFond, color: C.rouge }}>
+                  {it.badge}
+                </span>
+              )}
+            </button>
+          ))}
+          <button onClick={onDeconnexion} className="eduai-focus flex items-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-medium text-left mt-1" style={{ color: C.encreDoux }}>
+            <LogOut size={14} /> Déconnexion
+          </button>
+        </nav>
+      )}
+      </div>
   );
 }
 
