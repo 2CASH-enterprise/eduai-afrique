@@ -258,6 +258,18 @@ de formule (upgrade/downgrade — qui déclenche ça, l'Admin Plateforme ?).
 
 ---
 
+## 24. Menu hamburger sur les autres espaces — reporté le 05/08
+
+**Fait le 05/08** : navigation responsive (horizontal → hamburger déroulant
+sur mobile/tablette) sur l'espace **Enseignant** uniquement — c'est celui
+avec le plus d'éléments dans la barre (9), donc le plus urgent.
+
+**Reste à faire, même traitement** : Admin Plateforme, Direction,
+Administration (et Élève/Parent le jour où ils seront activés). Pas
+urgent — reporté consciemment, à reprendre plus tard.
+
+---
+
 ## 23. Modules actifs sur le portail public — ✅ FAIT le 05/08
 
 **Discuté et cadré le 05/08**, en préparation du lancement en test ouvert
