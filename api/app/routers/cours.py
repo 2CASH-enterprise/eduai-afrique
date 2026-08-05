@@ -79,13 +79,21 @@ def deposer_cours(
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                                      detail="Vous n'êtes pas affecté à cette classe pour cette matière")
         else:
-            # Classe personnelle — vérifie qu'elle appartient bien à l'enseignant.
+            # Classe personnelle — vérifie qu'elle appartient bien à
+            # l'enseignant ET que la matière du dépôt correspond à celle
+            # déclarée pour cette classe. Même rigueur que pour une classe
+            # d'établissement — faille de validation trouvée et corrigée
+            # le 05/08 (rien n'empêchait jusque-là un appel API direct de
+            # déposer un cours de SVT sur une classe personnelle nominalement
+            # Mathématiques ; l'interface elle-même ne le permettait pas,
+            # puisqu'elle combine classe et matière dans un seul sélecteur).
             cur.execute(
-                "SELECT 1 FROM classes_personnelles WHERE id = %s AND enseignant_id = %s",
-                (payload.classe_personnelle_id, enseignant.id),
+                "SELECT 1 FROM classes_personnelles WHERE id = %s AND enseignant_id = %s AND matiere_id = %s",
+                (payload.classe_personnelle_id, enseignant.id, payload.matiere_id),
             )
             if cur.fetchone() is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Classe personnelle introuvable")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                     detail="Classe personnelle introuvable, ou matière ne correspondant pas à celle déclarée pour cette classe")
 
         # Vérifie et débite les crédits AVANT toute génération IA — pas de
         # sens à appeler Mistral (coût réel) si l'enseignant ne peut de
@@ -237,10 +245,11 @@ def dupliquer_cours(cours_id: str, payload: DuplicationCours,
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                                      detail="Vous n'êtes pas affecté à cette classe pour cette matière")
         else:
-            cur.execute("SELECT 1 FROM classes_personnelles WHERE id = %s AND enseignant_id = %s",
-                        (payload.classe_personnelle_id, enseignant.id))
+            cur.execute("SELECT 1 FROM classes_personnelles WHERE id = %s AND enseignant_id = %s AND matiere_id = %s",
+                        (payload.classe_personnelle_id, enseignant.id, matiere_id))
             if cur.fetchone() is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Classe personnelle introuvable")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                     detail="Classe personnelle introuvable, ou matière ne correspondant pas à celle déclarée pour cette classe")
 
         cur.execute(
             """
