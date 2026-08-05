@@ -566,7 +566,7 @@ tâche opérationnelle en attente du matériel source.
 
 ---
 
-## 10. Nom de domaine + HTTPS — nouveau, identifié comme prérequis du point 4
+## 10. Nom de domaine + HTTPS — bloqué sur l'achat du domaine (05/08)
 
 **Découvert le 01/08** en construisant le hors-ligne : les service workers
 (la brique technique du hors-ligne) exigent HTTPS pour s'activer, sauf en
@@ -574,10 +574,32 @@ localhost. Tant que l'application tourne en HTTP simple sur l'IP du VPS
 (`http://89.116.111.3`), le hors-ligne construit au point 4 restera
 inactif en production, même si le code est bien déployé.
 
-**À faire** : acheter/configurer un nom de domaine, mettre en place un
-certificat HTTPS (ex : Let's Encrypt via Certbot) devant l'application —
-probablement avec un reverse proxy (nginx) devant l'API et le frontend,
-puisqu'ils tournent actuellement sur des ports distincts en HTTP direct.
+**Redevenu urgent le 05/08** : c'est aussi un vrai préalable à toute
+migration du frontend vers Vercel — Vercel donne du HTTPS automatique au
+frontend, mais un navigateur bloque purement et simplement un appel HTTPS
+→ HTTP ("contenu mixte") : sans HTTPS sur l'API, migrer le frontend
+casserait complètement les appels API.
+
+**Statut au 05/08** : discuté, plan clair, mais **bloqué sur l'achat du
+nom de domaine** (paiement pas encore possible côté utilisateur — à
+reprendre "plus tard"). Rien à débloquer techniquement tant que ce
+préalable n'est pas réglé — un certificat Let's Encrypt exige un vrai nom
+de domaine, impossible d'en obtenir un pour une IP nue.
+
+**Marche à suivre, prête pour quand le domaine sera acheté** :
+1. Acheter un nom de domaine (n'importe quel registraire — Namecheap,
+   OVH, Gandi... ~10-15 $/an pour un `.com`)
+2. Pointer un enregistrement DNS de type **A** vers `89.116.111.3`
+   (racine du domaine, ou sous-domaine type `app.`)
+3. Prévoir une séparation en deux adresses : une pour le frontend (ex :
+   `votredomaine.com`), une pour l'API (ex : `api.votredomaine.com`)
+4. Une fois pointé : mettre en place nginx en façade + certificat Let's
+   Encrypt (Certbot) pour les deux adresses
+5. Mettre à jour le code pour utiliser les nouvelles adresses HTTPS au
+   lieu de l'IP en dur (`http://89.116.111.3:8000` apparaît à plusieurs
+   endroits dans le frontend — `API_BASE_URL` dans chaque fichier
+   `espace-*.jsx`, et dans `web/app/page.jsx`), et ajuster CORS côté API
+6. Alors seulement : migration éventuelle du frontend vers Vercel
 
 ---
 
