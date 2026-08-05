@@ -48,36 +48,51 @@ export default async function Accueil() {
   const espacesVisibles = ESPACES.filter((e) => modulesActifs.has(e.module));
 
   return (
-    <div className="eduai-root min-h-screen flex items-center justify-center px-6 py-16" style={{ backgroundColor: C.fond }}>
+    <div className="eduai-root min-h-screen flex flex-col" style={{ backgroundColor: C.fond }}>
       <style>{STYLES}</style>
-      <div className="w-full max-w-3xl">
-        <div className="flex items-center justify-center gap-2 mb-3">
-          <GraduationCap size={28} color={C.encre} strokeWidth={1.75} />
-          <span className="eduai-display text-3xl" style={{ color: C.encre }}>
-            ÉduAI <span style={{ color: C.accent }}>Afrique</span>
-          </span>
-        </div>
-        <p className="text-center text-sm mb-12" style={{ color: C.encreDoux }}>
-          Choisissez votre espace pour vous connecter.
-        </p>
+      <div className="flex-1 flex items-center justify-center px-6 py-16">
+        <div className="w-full max-w-3xl">
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <GraduationCap size={28} color={C.encre} strokeWidth={1.75} />
+            <span className="eduai-display text-3xl" style={{ color: C.encre }}>
+              ÉduAI <span style={{ color: C.accent }}>Afrique</span>
+            </span>
+          </div>
+          <p className="text-center text-sm mb-1" style={{ color: C.encreDoux }}>
+            Plateforme pédagogique intelligente, enrichie par les programmes officiels d'Afrique francophone.
+          </p>
+          <p className="text-center text-sm mb-12" style={{ color: C.encreDoux }}>
+            Choisissez votre espace pour vous connecter.
+          </p>
 
-        <div className={`grid grid-cols-1 ${espacesVisibles.length > 1 ? "sm:grid-cols-2" : ""} gap-4`}>
-          {espacesVisibles.map((e) => (
-            <Link
-              key={e.href}
-              href={e.href}
-              className="rounded-xl p-6 border transition-transform hover:-translate-y-0.5 flex items-start gap-4"
-              style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}
-            >
-              <e.icon size={22} color={C.accentFonce} className="mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="eduai-display text-lg" style={{ color: C.encre }}>{e.label}</p>
-                <p className="text-xs mt-1" style={{ color: C.encreDoux }}>{e.desc}</p>
-              </div>
-            </Link>
-          ))}
+          <div className={`grid grid-cols-1 ${espacesVisibles.length > 1 ? "sm:grid-cols-2" : ""} gap-4`}>
+            {espacesVisibles.map((e) => (
+              <Link
+                key={e.href}
+                href={e.href}
+                className="rounded-xl p-6 border transition-transform hover:-translate-y-0.5 flex items-start gap-4"
+                style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}
+              >
+                <e.icon size={22} color={C.accentFonce} className="mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="eduai-display text-lg" style={{ color: C.encre }}>{e.label}</p>
+                  <p className="text-xs mt-1" style={{ color: C.encreDoux }}>{e.desc}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
+
+      <footer className="px-6 py-6 text-center border-t" style={{ borderColor: C.ligne }}>
+        <p className="text-xs" style={{ color: C.encreDoux }}>
+          © {new Date().getFullYear()} ÉduAI Afrique
+          <span className="mx-2">·</span>
+          <Link href="/cgu" className="hover:underline" style={{ color: C.encreDoux }}>Conditions d'utilisation</Link>
+          <span className="mx-2">·</span>
+          <Link href="/confidentialite" className="hover:underline" style={{ color: C.encreDoux }}>Confidentialité</Link>
+        </p>
+      </footer>
     </div>
   );
 }
