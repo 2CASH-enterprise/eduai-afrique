@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from .routers import auth, exercices, eleve, direction, administration, parent, cours, classes, etablissement, bulletins_pdf, documents, documents_enseignant, plateforme, invitations, generation_libre, structure_scolaire, classes_personnelles, modules
+from .routers import auth, exercices, eleve, direction, administration, parent, cours, classes, etablissement, bulletins_pdf, documents, documents_enseignant, plateforme, invitations, generation_libre, structure_scolaire, classes_personnelles, modules, monitoring
 
 app = FastAPI(
     title="OskarAI — API",
@@ -53,6 +53,7 @@ app.include_router(generation_libre.router)
 app.include_router(structure_scolaire.router)
 app.include_router(classes_personnelles.router)
 app.include_router(modules.router)
+app.include_router(monitoring.router)
 
 
 @app.get("/healthz")

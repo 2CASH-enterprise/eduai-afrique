@@ -602,6 +602,19 @@ INSERT INTO modules_actifs (module, actif) VALUES
     ('eleve', false), ('enseignant', false), ('direction', false),
     ('parent', false), ('administration', false);
 
+-- ============================================================================
+-- Monitoring des bugs — génération IA, plantages navigateur (migration 016)
+-- ============================================================================
+CREATE TABLE erreurs_systeme (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    type_erreur  TEXT NOT NULL CHECK (type_erreur IN ('generation_ia', 'plantage_navigateur', 'autre')),
+    message      TEXT NOT NULL,
+    contexte     JSONB,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_erreurs_systeme_type ON erreurs_systeme(type_erreur);
+CREATE INDEX idx_erreurs_systeme_created ON erreurs_systeme(created_at DESC);
+
 -- Couverture par pays — blocage des inscriptions sans corpus (migration 012)
 -- ============================================================================
 CREATE TABLE pays_couverture (

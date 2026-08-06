@@ -237,4 +237,9 @@ def generer_ressource(type_ressource: str, titre_cours: str, contenu_texte: str 
         # afficher, ou de perdre le contenu généré.
         return {"texte": aplatir_en_texte(donnees)}
     except Exception as e:
+        from . import erreurs
+        erreurs.enregistrer_erreur("generation_ia", str(e), {
+            "endpoint": "deposer_cours", "type_ressource": type_ressource,
+            "titre_cours": titre_cours, "enseignant_id": enseignant_id,
+        })
         return {"texte": f"[Erreur de génération : {e}] {titre_cours}"}

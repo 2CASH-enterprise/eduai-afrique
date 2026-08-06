@@ -166,6 +166,7 @@ function BarreNav({ vue, setVue, onDeconnexion }) {
     { id: "pays", label: "Pays" },
     { id: "modules", label: "Modules" },
     { id: "enseignants", label: "Enseignants" },
+    { id: "monitoring", label: "Monitoring" },
   ];
   return (
     <div className="sticky top-0 z-10 px-4 sm:px-8 py-3.5 flex items-center justify-between border-b flex-wrap gap-y-2"
@@ -847,6 +848,99 @@ function EcranEnseignants({ token }) {
   );
 }
 
+const LABELS_TYPE_ERREUR = {
+  generation_ia: "Génération IA",
+  plantage_navigateur: "Plantage navigateur",
+  indexation_document: "Document mal indexé",
+  autre: "Autre",
+};
+const COULEURS_TYPE_ERREUR = {
+  generation_ia: { bg: "#FBE7E7", fg: "#A32D2D" },
+  plantage_navigateur: { bg: "#F5EBD8", fg: "#B0813A" },
+  indexation_document: { bg: "#E7E2D6", fg: "#5B6472" },
+  autre: { bg: "#E7E2D6", fg: "#5B6472" },
+};
+
+function EcranMonitoring({ token }) {
+  const [erreurs, setErreurs] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreurChargement, setErreurChargement] = useState(null);
+  const [filtre, setFiltre] = useState("tous");
+  const [ouvert, setOuvert] = useState(null);
+
+  const charger = useCallback(() => {
+    setChargement(true); setErreurChargement(null);
+    apiFetch("/plateforme/erreurs", { token }).then(setErreurs).catch((e) => setErreurChargement(e.message)).finally(() => setChargement(false));
+  }, [token]);
+
+  useEffect(() => { charger(); }, [charger]);
+
+  const compteurs = erreurs.reduce((acc, e) => { acc[e.type_erreur] = (acc[e.type_erreur] || 0) + 1; return acc; }, {});
+  const lignesAffichees = filtre === "tous" ? erreurs : erreurs.filter((e) => e.type_erreur === filtre);
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="eduai-display text-3xl mb-1" style={{ color: C.encre }}>Monitoring</h1>
+          <p className="text-sm" style={{ color: C.encreDoux }}>{erreurs.length} événement{erreurs.length !== 1 ? "s" : ""} récent{erreurs.length !== 1 ? "s" : ""} (200 derniers, tous types confondus).</p>
+        </div>
+        <button onClick={charger} className="eduai-focus rounded-lg px-3 py-1.5 text-xs font-medium border" style={{ borderColor: C.ligne, color: C.encreDoux }}>
+          Actualiser
+        </button>
+      </div>
+
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {["tous", "generation_ia", "plantage_navigateur", "indexation_document"].map((f) => (
+          <button key={f} onClick={() => setFiltre(f)}
+            className="eduai-focus rounded-full px-3 py-1.5 text-xs font-medium border"
+            style={filtre === f ? { backgroundColor: C.encre, color: C.surface, borderColor: C.encre } : { borderColor: C.ligne, color: C.encreDoux }}>
+            {f === "tous" ? `Tous (${erreurs.length})` : `${LABELS_TYPE_ERREUR[f]} (${compteurs[f] || 0})`}
+          </button>
+        ))}
+      </div>
+
+      <BandeauErreur message={erreurChargement} />
+
+      {chargement ? <Chargement /> : (
+        <div className="space-y-2">
+          {lignesAffichees.map((e) => {
+            const couleur = COULEURS_TYPE_ERREUR[e.type_erreur] || COULEURS_TYPE_ERREUR.autre;
+            const estOuvert = ouvert === e.id;
+            return (
+              <div key={e.id} className="rounded-xl border overflow-hidden" style={{ backgroundColor: C.surface, borderColor: C.ligne }}>
+                <button onClick={() => setOuvert(estOuvert ? null : e.id)} className="eduai-focus w-full flex items-start justify-between gap-3 px-4 py-3 text-left">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="eduai-mono text-[10px] px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: couleur.bg, color: couleur.fg }}>
+                        {LABELS_TYPE_ERREUR[e.type_erreur] || e.type_erreur}
+                      </span>
+                      <span className="text-[11px]" style={{ color: C.encreAttenue }}>
+                        {new Date(e.created_at).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <p className="text-sm truncate" style={{ color: C.encre }}>{e.message}</p>
+                  </div>
+                </button>
+                {estOuvert && e.contexte && (
+                  <div className="px-4 pb-3.5 pt-1 border-t" style={{ borderColor: C.ligne }}>
+                    <pre className="text-[11px] whitespace-pre-wrap eduai-mono" style={{ color: C.encreDoux }}>
+                      {JSON.stringify(e.contexte, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {lignesAffichees.length === 0 && (
+            <p className="text-sm text-center py-8" style={{ color: C.encreDoux }}>Aucun événement dans cette catégorie — tout va bien.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [token, setToken] = useState(null);
   const [connexionEnCours, setConnexionEnCours] = useState(false);
@@ -881,6 +975,7 @@ export default function App() {
           {vue === "pays" && <EcranPays token={token} />}
           {vue === "modules" && <EcranModules token={token} />}
           {vue === "enseignants" && <EcranEnseignants token={token} />}
+          {vue === "monitoring" && <EcranMonitoring token={token} />}
         </>
       )}
     </div>

@@ -258,6 +258,38 @@ de formule (upgrade/downgrade — qui déclenche ça, l'Admin Plateforme ?).
 
 ---
 
+## 25. Monitoring des bugs — ✅ FAIT le 06/08
+
+**Discuté et cadré le 06/08**, suite à un vrai incident (plantage React
+#31 en production, découvert par capture d'écran de l'utilisateur plutôt
+qu'automatiquement). Trois sources de bugs, jusque-là invisibles côté
+équipe, rassemblées dans un même écran Admin Plateforme :
+
+1. **Échecs de génération IA** (y compris crédits Mistral épuisés) —
+   avant, avalés silencieusement dans le contenu généré
+   (`"[Erreur de génération : ...]"`), sans que personne ne le sache.
+   Journalisés automatiquement maintenant, aux deux points de génération
+   (Déposer un cours, Génération libre).
+2. **Plantages navigateur** — un Error Boundary React global
+   (`web/components/ErrorBoundary.jsx`, branché dans `layout.jsx`, couvre
+   toute l'application) remonte automatiquement chaque plantage au
+   serveur, et affiche un écran de repli propre ("Une erreur est
+   survenue... L'équipe a été informée") au lieu de la page blanche par
+   défaut de Next.js.
+3. **Documents mal indexés** — existait déjà (`documents_pedagogiques.
+   erreur_traitement`), juste rassemblé dans le même écran plutôt que
+   noyé ailleurs.
+
+**Construit et déployé** : table `erreurs_systeme` (migration 016),
+module `erreurs.py` (journalisation best-effort, n'échoue jamais l'appel
+qui l'utilise), endpoint public `POST /erreurs/plantage-navigateur` (sans
+authentification — un plantage peut survenir avant toute connexion),
+endpoint protégé `GET /plateforme/erreurs` (vue unifiée des trois
+sources), écran "Monitoring" avec filtres par type et détail dépliable
+(contexte JSON).
+
+---
+
 ## 24. Menu hamburger sur les autres espaces — reporté le 05/08
 
 **Fait le 05/08** : navigation responsive (horizontal → hamburger déroulant

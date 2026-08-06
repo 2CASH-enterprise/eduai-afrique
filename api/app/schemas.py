@@ -630,6 +630,21 @@ class EnseignantResume(BaseModel):
     created_at: datetime
 
 
+class RapportPlantage(BaseModel):
+    message: str
+    stack: str | None = None
+    url: str | None = None
+    user_agent: str | None = None
+
+
+class ErreurSysteme(BaseModel):
+    id: str
+    type_erreur: str  # 'generation_ia' | 'plantage_navigateur' | 'indexation_document'
+    message: str
+    contexte: dict | None
+    created_at: datetime
+
+
 class CreationEtablissement(BaseModel):
     nom: str
     pays: str

@@ -1,5 +1,6 @@
 import "./globals.css";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 export const metadata = {
   title: "OskarAI",
@@ -16,7 +17,7 @@ export default function RootLayout({ children }) {
     <html lang="fr">
       <body>
         <ServiceWorkerRegistration />
-        {children}
+        <ErrorBoundary>{children}</ErrorBoundary>
       </body>
     </html>
   );

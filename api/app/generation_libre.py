@@ -85,6 +85,10 @@ def generer_exercice_a_la_demande(matiere: str, niveau: str, theme: str, passage
             temperature=0.7,
         )
     except Exception as e:
+        from . import erreurs
+        erreurs.enregistrer_erreur("generation_ia", str(e), {
+            "endpoint": "generation_libre", "matiere": matiere, "niveau": niveau, "theme": theme,
+        })
         raise HTTPException(status_code=502, detail=f"Erreur lors de l'appel à l'IA : {e}")
 
     brut = reponse.choices[0].message.content
