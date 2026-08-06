@@ -152,6 +152,32 @@ LABELS_DIFFICULTE = {
 }
 
 
+def _conformer_au_gabarit(valeur, gabarit):
+    """Force `valeur` à respecter la FORME du gabarit (l'exemple de schéma
+    envoyé dans le prompt), en aplatissant en texte toute divergence — quel
+    que soit l'endroit précis où elle survient. `_structure_valide` ne
+    vérifie que la structure de surface (les bonnes clés présentes, pas
+    vides) ; ça ne suffit pas si l'IA respecte les clés de premier niveau
+    mais renvoie un objet imbriqué là où une simple chaîne était attendue
+    en profondeur (incident du 06/08 : {"phrase_1": ..., "phrase_5": ...}
+    au lieu d'une phrase, dans un champ texte quelconque)."""
+    if isinstance(gabarit, str):
+        return valeur if isinstance(valeur, str) else aplatir_en_texte(valeur)
+    if isinstance(gabarit, (int, float, bool)) or gabarit is None:
+        return valeur
+    if isinstance(gabarit, list):
+        if not isinstance(valeur, list):
+            return [aplatir_en_texte(valeur)] if valeur else []
+        modele_item = gabarit[0] if gabarit else None
+        return [_conformer_au_gabarit(item, modele_item) if modele_item is not None else item for item in valeur]
+    if isinstance(gabarit, dict):
+        if not isinstance(valeur, dict):
+            return {}
+        return {cle: _conformer_au_gabarit(valeur[cle], sous_gabarit)
+                for cle, sous_gabarit in gabarit.items() if cle in valeur}
+    return valeur
+
+
 def generer_ressource(type_ressource: str, titre_cours: str, contenu_texte: str | None,
                        matiere_nom: str, niveau_nom: str,
                        niveau_id: str | None, matiere_id: str | None,
@@ -203,7 +229,7 @@ def generer_ressource(type_ressource: str, titre_cours: str, contenu_texte: str 
         donnees = json.loads(re.sub(r"^```json\s*|\s*```$", "", brut.strip()))
 
         if _structure_valide(type_ressource, donnees):
-            return donnees
+            return _conformer_au_gabarit(donnees, SCHEMAS_PAR_TYPE[type_ressource])
 
         # L'IA n'a pas respecté le schéma attendu (ça arrive, même avec un
         # exemple explicite) — on aplatit tout ce qu'elle a renvoyé plutôt
