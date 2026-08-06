@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from .routers import auth, exercices, eleve, direction, administration, parent, cours, classes, etablissement, bulletins_pdf, documents, documents_enseignant, plateforme, invitations, generation_libre, structure_scolaire, classes_personnelles, modules
 
 app = FastAPI(
-    title="ÉduAI Afrique — API",
+    title="OskarAI — API",
     description="Modules Enseignant, Élève, Direction, Administration et Parent.",
     version="0.1.0",
 )

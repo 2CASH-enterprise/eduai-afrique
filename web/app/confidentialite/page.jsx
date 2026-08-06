@@ -5,7 +5,7 @@ const C = {
   encre: "#22304A", encreDoux: "#5B6472", accent: "#B08D57",
 };
 
-export const metadata = { title: "Politique de confidentialité — ÉduAI Afrique" };
+export const metadata = { title: "Politique de confidentialité — OskarAI" };
 
 export default function Confidentialite() {
   return (
@@ -16,11 +16,11 @@ export default function Confidentialite() {
         <div className="rounded-xl p-6 border text-sm leading-relaxed" style={{ backgroundColor: C.surface, borderColor: C.ligne, color: C.encreDoux }}>
           <p className="mb-3">
             Cette page est un espace réservé — le texte définitif de la politique de confidentialité
-            d'ÉduAI Afrique (données collectées, usage, conservation) n'a pas encore été rédigé.
+            d'OskarAI (données collectées, usage, conservation) n'a pas encore été rédigé.
           </p>
           <p>
             Pour toute question sur la gestion de vos données en attendant sa publication,
-            contactez l'équipe ÉduAI Afrique directement.
+            contactez l'équipe OskarAI directement.
           </p>
         </div>
       </div>

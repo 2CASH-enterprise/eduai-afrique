@@ -9,9 +9,14 @@ import {
 /*  Configuration API                                                  */
 /* ------------------------------------------------------------------ */
 
-const API_BASE_URL = "http://89.116.111.3:8000";
+const API_BASE_URL = "http://178.104.56.200:8000";
 
-class ErreurApi extends Error {}
+class ErreurApi extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+}
 
 async function apiFetch(path, { method = "GET", token, body, params } = {}) {
   let url = `${API_BASE_URL}${path}`;
@@ -36,7 +41,7 @@ async function apiFetch(path, { method = "GET", token, body, params } = {}) {
   try { donnees = await reponse.json(); } catch { /* corps vide */ }
   if (!reponse.ok) {
     const message = donnees?.detail || `Erreur ${reponse.status}`;
-    throw new ErreurApi(typeof message === "string" ? message : JSON.stringify(message));
+    throw new ErreurApi(typeof message === "string" ? message : JSON.stringify(message), reponse.status);
   }
   return donnees;
 }
@@ -163,7 +168,7 @@ function EcranConnexion({ onConnexion, connexionEnCours, erreurConnexion }) {
         <div className="flex items-center gap-2 mb-10 justify-center">
           <GraduationCap size={26} color={C.encre} strokeWidth={1.75} />
           <span className="eduai-display text-2xl" style={{ color: C.encre }}>
-            ÉduAI <span style={{ color: C.accent }}>Afrique</span>
+            Oskar<span style={{ color: C.accent }}>AI</span>
           </span>
         </div>
 
@@ -271,7 +276,7 @@ function BarreNav({ vue, setVue, onDeconnexion, token }) {
       >
         <button onClick={() => setVue("accueil")} className="eduai-focus flex items-center gap-2">
           <GraduationCap size={20} color={C.encre} strokeWidth={1.75} />
-          <span className="eduai-display text-base hidden sm:inline" style={{ color: C.encre }}>ÉduAI Afrique</span>
+          <span className="eduai-display text-base hidden sm:inline" style={{ color: C.encre }}>OskarAI</span>
         </button>
 
         <nav className="flex items-center gap-5">
@@ -625,7 +630,10 @@ export default function App() {
       apiFetch("/eleve/mon-planning", { token }),
     ])
       .then(([ex, res, plan]) => { setExercices(ex); setResultats(res); setPlanning(plan); })
-      .catch((e) => setErreurChargement(e.message))
+      .catch((e) => {
+        if (e.status === 401) { setToken(null); setErreurConnexion("Ce compte n'a pas accès à cet espace."); }
+        else setErreurChargement(e.message);
+      })
       .finally(() => setChargementInitial(false));
   }, [token]);
 

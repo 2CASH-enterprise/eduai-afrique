@@ -15,8 +15,8 @@ import {
 /* ------------------------------------------------------------------ */
 
 // À adapter à la main selon où tourne votre backend (dev local, VPS...).
-// Ex : "http://89.116.111.3:8000" une fois l'API déployée sur le serveur.
-const API_BASE_URL = "http://89.116.111.3:8000";
+// Ex : "http://178.104.56.200:8000" une fois l'API déployée sur le serveur.
+const API_BASE_URL = "http://178.104.56.200:8000";
 
 class ErreurApi extends Error {
   constructor(message, status) {
@@ -272,7 +272,7 @@ function EcranConnexion({ onConnexion, onInscription, connexionEnCours, erreurCo
         <div className="flex items-center gap-2 mb-10 justify-center">
           <GraduationCap size={26} color={C.encre} strokeWidth={1.75} />
           <span className="eduai-display text-2xl" style={{ color: C.encre }}>
-            ÉduAI <span style={{ color: C.accent }}>Afrique</span>
+            Oskar<span style={{ color: C.accent }}>AI</span>
           </span>
         </div>
 
@@ -408,7 +408,7 @@ function BarreNav({ vue, setVue, onDeconnexion, nombreEnAttente, nombreInvitatio
       <div className="flex items-center justify-between">
         <button onClick={() => choisir("accueil")} className="eduai-focus flex items-center gap-2">
           <GraduationCap size={20} color={C.encre} strokeWidth={1.75} />
-          <span className="eduai-display text-base hidden sm:inline" style={{ color: C.encre }}>ÉduAI Afrique</span>
+          <span className="eduai-display text-base hidden sm:inline" style={{ color: C.encre }}>OskarAI</span>
         </button>
 
         {/* Navigation horizontale — écrans larges uniquement */}
@@ -1090,7 +1090,7 @@ function EcranDeposerCours({ classes, token, setVue, onCoursDepose }) {
         L'IA génère automatiquement une fiche pédagogique, un résumé, des exercices, un QCM, un devoir et un contrôle.
       </p>
       <p className="flex items-center gap-1.5 text-xs mb-8" style={{ color: C.encreAttenue }}>
-        <AlertTriangle size={11} /> EduAI peut faire des erreurs, toujours vérifier les informations et surtout valider les exercices avant de les mettre à la disposition des élèves.
+        <AlertTriangle size={11} /> OskarAI peut faire des erreurs, toujours vérifier les informations et surtout valider les exercices avant de les mettre à la disposition des élèves.
       </p>
 
       <BandeauErreur message={erreur} />
@@ -2248,7 +2248,7 @@ function EcranGenerationLibre({ token }) {
         silencieusement le corpus utilisé par l'IA. Toujours gratuit, quel que soit ton solde de crédits.
       </p>
       <p className="flex items-center gap-1.5 text-xs mb-8" style={{ color: C.encreAttenue }}>
-        <AlertTriangle size={11} /> EduAI peut faire des erreurs, toujours vérifier les informations et surtout valider les exercices avant de les mettre à la disposition des élèves.
+        <AlertTriangle size={11} /> OskarAI peut faire des erreurs, toujours vérifier les informations et surtout valider les exercices avant de les mettre à la disposition des élèves.
       </p>
 
       <BandeauErreur message={erreur} />

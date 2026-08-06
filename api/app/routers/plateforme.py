@@ -161,7 +161,7 @@ def importer_documents_en_masse(payload: DemandeImportDocuments, admin: AdminPla
             # incident constaté le 02/08 avec un vrai lien PDF sénégalais.
             reponse = httpx.get(
                 ligne.url, timeout=60.0, follow_redirects=True,
-                headers={"User-Agent": "Mozilla/5.0 (compatible; EduAI-Afrique/1.0; +https://89.116.111.3)"},
+                headers={"User-Agent": "Mozilla/5.0 (compatible; OskarAI/1.0; +https://178.104.56.200)"},
             )
             reponse.raise_for_status()
             contenu = reponse.content

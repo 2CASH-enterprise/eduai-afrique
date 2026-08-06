@@ -99,7 +99,7 @@ def _generer_pdf_bulletin(etablissement: dict, eleve: dict, bulletin: dict, note
     # Pied de page
     c.setFont("Helvetica", 7)
     c.setFillColor(COULEUR_GRIS)
-    c.drawCentredString(largeur / 2, marge / 2, f"Généré par ÉduAI Afrique — {etablissement['nom']}")
+    c.drawCentredString(largeur / 2, marge / 2, f"Généré par OskarAI — {etablissement['nom']}")
 
     c.showPage()
     c.save()

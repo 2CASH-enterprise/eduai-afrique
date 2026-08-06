@@ -2,7 +2,7 @@ import "./globals.css";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 
 export const metadata = {
-  title: "ÉduAI Afrique",
+  title: "OskarAI",
   description: "Plateforme pédagogique intelligente pour l'Afrique francophone",
   manifest: "/manifest.json",
 };

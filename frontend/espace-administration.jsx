@@ -2,15 +2,21 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   GraduationCap, Lock, Mail, LogOut, Bell, Loader2, AlertTriangle,
   Users, Plus, UserX, ScrollText, Send, Wallet, Check, Copy, Upload, FileSpreadsheet, Download,
+  FileText, Trash2, BookMarked, UserPlus, Layers, Calendar, School,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
 /*  Configuration API                                                  */
 /* ------------------------------------------------------------------ */
 
-const API_BASE_URL = "http://89.116.111.3:8000";
+const API_BASE_URL = "http://178.104.56.200:8000";
 
-class ErreurApi extends Error {}
+class ErreurApi extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+}
 
 async function apiFetch(path, { method = "GET", token, body, params } = {}) {
   let url = `${API_BASE_URL}${path}`;
@@ -42,7 +48,7 @@ async function apiFetch(path, { method = "GET", token, body, params } = {}) {
   try { donnees = await reponse.json(); } catch { /* corps vide */ }
   if (!reponse.ok) {
     const message = donnees?.detail || `Erreur ${reponse.status}`;
-    throw new ErreurApi(typeof message === "string" ? message : JSON.stringify(message));
+    throw new ErreurApi(typeof message === "string" ? message : JSON.stringify(message), reponse.status);
   }
   return donnees;
 }
@@ -120,7 +126,7 @@ function EcranConnexion({ onConnexion, connexionEnCours, erreurConnexion }) {
       <div className="w-full max-w-sm eduai-fade-in">
         <div className="flex items-center gap-2 mb-10 justify-center">
           <GraduationCap size={26} color={C.encre} strokeWidth={1.75} />
-          <span className="eduai-display text-2xl" style={{ color: C.encre }}>ÉduAI <span style={{ color: C.accent }}>Afrique</span></span>
+          <span className="eduai-display text-2xl" style={{ color: C.encre }}>Oskar<span style={{ color: C.accent }}>AI</span></span>
         </div>
         <div className="rounded-2xl p-8 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
           <h1 className="eduai-display text-xl mb-1" style={{ color: C.encre }}>Espace Administration</h1>
@@ -161,13 +167,16 @@ function BarreNav({ vue, setVue, onDeconnexion }) {
     { id: "notifications", label: "Notifications" },
     { id: "paiements", label: "Paiements" },
     { id: "etablissement", label: "Établissement" },
+    { id: "structure", label: "Structure" },
+    { id: "documents", label: "Documents" },
+    { id: "invitations", label: "Invitations" },
   ];
   return (
     <div className="sticky top-0 z-10 px-4 sm:px-8 py-3.5 flex items-center justify-between border-b flex-wrap gap-y-2"
       style={{ backgroundColor: "rgba(250,248,243,0.92)", backdropFilter: "blur(6px)", borderColor: C.ligne }}>
       <button onClick={() => setVue("utilisateurs")} className="eduai-focus flex items-center gap-2">
         <GraduationCap size={20} color={C.encre} strokeWidth={1.75} />
-        <span className="eduai-display text-base hidden sm:inline" style={{ color: C.encre }}>ÉduAI Afrique</span>
+        <span className="eduai-display text-base hidden sm:inline" style={{ color: C.encre }}>OskarAI</span>
       </button>
       <nav className="flex items-center gap-4 overflow-x-auto">
         {items.map((it) => (
@@ -1221,6 +1230,527 @@ function CalendrierReferentiel({ token, referentielId }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Écran : Documents (programmes officiels — portée plateforme)       */
+/* ------------------------------------------------------------------ */
+
+function BadgeStatutDocument({ statut }) {
+  const map = {
+    en_traitement: { label: "Indexation en cours...", bg: C.bleuFond, fg: C.encre },
+    indexe: { label: "Indexé", bg: C.vertFond, fg: C.vert },
+    erreur: { label: "Erreur d'indexation", bg: C.rougeFond, fg: C.rouge },
+  };
+  const s = map[statut] || map.en_traitement;
+  return (
+    <span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: s.bg, color: s.fg }}>
+      {s.label}
+    </span>
+  );
+}
+
+function FormulaireDepotProgramme({ token, classes, matieres, onDepose }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [titre, setTitre] = useState("");
+  const [niveauId, setNiveauId] = useState("");
+  const [matiereId, setMatiereId] = useState(matieres[0]?.id || "");
+  const [fichier, setFichier] = useState(null);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState(null);
+
+  const niveaux = [...new Map(classes.map((c) => [c.niveau_id, c.niveau])).entries()];
+
+  async function soumettre(e) {
+    e.preventDefault();
+    if (!fichier) { setErreur("Choisissez un fichier PDF."); return; }
+    setEnvoi(true); setErreur(null);
+    try {
+      const formData = new FormData();
+      formData.append("fichier", fichier);
+      await apiFetch("/administration/documents", {
+        method: "POST", token, params: { titre, niveau_id: niveauId || undefined, matiere_id: matiereId || undefined },
+        body: formData,
+      });
+      setTitre(""); setNiveauId(""); setFichier(null); setOuvert(false);
+      onDepose();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoi(false); }
+  }
+
+  if (!ouvert) {
+    return (
+      <button onClick={() => setOuvert(true)} className="eduai-focus flex items-center gap-1.5 text-xs font-medium" style={{ color: C.accentFonce }}>
+        <Plus size={13} /> Déposer un programme officiel
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={soumettre} className="rounded-lg p-4 border space-y-2.5" style={{ borderColor: C.ligne, backgroundColor: C.fond }}>
+      <BandeauErreur message={erreur} />
+      <input required value={titre} onChange={(e) => setTitre(e.target.value)} placeholder="Titre (ex : Programme Maths 6ème — MINESEC)"
+        className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }} />
+      <div className="grid grid-cols-2 gap-2">
+        <select value={niveauId} onChange={(e) => setNiveauId(e.target.value)} className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }}>
+          <option value="">Niveau (optionnel)...</option>
+          {niveaux.map(([id, nom]) => <option key={id} value={id}>{nom}</option>)}
+        </select>
+        <select value={matiereId} onChange={(e) => setMatiereId(e.target.value)} className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.surface, color: C.encre }}>
+          {matieres.map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
+        </select>
+      </div>
+      <label className="eduai-focus flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium border cursor-pointer w-fit" style={{ borderColor: C.ligne, color: C.encre, backgroundColor: C.surface }}>
+        <Upload size={12} />
+        {fichier ? fichier.name : "Choisir un PDF"}
+        <input type="file" accept="application/pdf" className="hidden" onChange={(e) => setFichier(e.target.files[0] || null)} />
+      </label>
+      <div className="flex gap-2 pt-1">
+        <button type="submit" disabled={envoi} className="eduai-focus rounded-lg px-3.5 py-2 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
+          {envoi ? <Loader2 size={12} className="eduai-spin" /> : "Déposer"}
+        </button>
+        <button type="button" onClick={() => setOuvert(false)} className="eduai-focus text-xs font-medium" style={{ color: C.encreDoux }}>Annuler</button>
+      </div>
+    </form>
+  );
+}
+
+function EcranDocuments({ token, classes, matieres }) {
+  const [documents, setDocuments] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+
+  const charger = useCallback(() => {
+    setChargement(true); setErreur(null);
+    apiFetch("/administration/documents", { token })
+      .then(setDocuments).catch((e) => setErreur(e.message)).finally(() => setChargement(false));
+  }, [token]);
+
+  useEffect(() => { charger(); }, [charger]);
+
+  async function supprimer(id) {
+    try {
+      await apiFetch(`/administration/documents/${id}`, { method: "DELETE", token });
+      setDocuments((prev) => prev.filter((d) => d.id !== id));
+    } catch (e) { setErreur(e.message); }
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
+      <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Documents</h1>
+      <p className="text-sm mb-8" style={{ color: C.encreDoux }}>
+        Programmes officiels utilisés par l'IA pour ancrer ses générations. Une fois déposé, un document est
+        <span className="font-semibold"> visible et réutilisable par tous les établissements de la plateforme</span> —
+        aucun contenu n'est jamais relu ni téléchargé, seul le texte indexé sert en interne.
+      </p>
+
+      <BandeauErreur message={erreur} />
+
+      <div className="rounded-2xl p-6 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+        <h2 className="eduai-display text-lg mb-4" style={{ color: C.encre }}>Programmes officiels</h2>
+
+        <FormulaireDepotProgramme token={token} classes={classes} matieres={matieres} onDepose={charger} />
+
+        {chargement ? <Chargement /> : (
+          <div className="space-y-2 mt-5">
+            {documents.map((d) => (
+              <div key={d.id} className="flex items-center justify-between rounded-lg border px-3 py-2.5" style={{ borderColor: C.ligne }}>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <FileText size={15} color={C.encreAttenue} className="flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: C.encre }}>{d.titre}</p>
+                    <p className="text-xs" style={{ color: C.encreAttenue }}>
+                      {[d.niveau, d.matiere].filter(Boolean).join(" · ") || "Niveau/matière non précisés"}
+                      {d.nombre_pages ? ` · ${d.nombre_pages} page${d.nombre_pages > 1 ? "s" : ""}` : ""}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <BadgeStatutDocument statut={d.statut} />
+                  <button onClick={() => supprimer(d.id)} className="eduai-focus" aria-label="Supprimer" style={{ color: C.encreAttenue }}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {documents.length === 0 && (
+              <p className="text-sm text-center py-6" style={{ color: C.encreAttenue }}>Aucun programme officiel déposé pour l'instant.</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Écran : Invitations (enseignants indépendants)                     */
+/* ------------------------------------------------------------------ */
+
+function EcranInvitations({ token, classes, matieres }) {
+  const [invitations, setInvitations] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+  const [email, setEmail] = useState("");
+  const [typeInvitation, setTypeInvitation] = useState("rejoindre"); // "rejoindre" | "classe"
+  const [classeId, setClasseId] = useState("");
+  const [matiereId, setMatiereId] = useState(matieres[0]?.id || "");
+  const [envoi, setEnvoi] = useState(false);
+  const [succes, setSucces] = useState(null);
+
+  const charger = useCallback(() => {
+    setChargement(true); setErreur(null);
+    apiFetch("/administration/invitations", { token }).then(setInvitations).catch((e) => setErreur(e.message)).finally(() => setChargement(false));
+  }, [token]);
+
+  useEffect(() => { charger(); }, [charger]);
+
+  async function envoyer(e) {
+    e.preventDefault();
+    setEnvoi(true); setErreur(null); setSucces(null);
+    try {
+      const body = typeInvitation === "classe" ? { email, classe_id: classeId, matiere_id: matiereId } : { email };
+      await apiFetch("/administration/invitations", { method: "POST", token, body });
+      setSucces(`Invitation envoyée à ${email}.`);
+      setEmail("");
+      charger();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoi(false); }
+  }
+
+  const badgeStatut = (s) => {
+    if (s === "acceptee") return { label: "Acceptée", bg: C.vertFond, fg: C.vert };
+    if (s === "refusee") return { label: "Refusée", bg: C.rougeFond, fg: C.rouge };
+    return { label: "En attente", bg: C.bleuFond, fg: C.encre };
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
+      <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Invitations</h1>
+      <p className="text-sm mb-8" style={{ color: C.encreDoux }}>
+        Invitez un enseignant déjà inscrit sur la plateforme à rejoindre votre établissement, ou simplement à enseigner
+        une classe précise chez vous — utile si son établissement principal est ailleurs (multi-établissement).
+      </p>
+
+      <BandeauErreur message={erreur} />
+      <BandeauSucces message={succes} />
+
+      <form onSubmit={envoyer} className="rounded-2xl p-5 border space-y-3 mb-6" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+        <div className="flex gap-1 rounded-lg p-1" style={{ backgroundColor: C.fond }}>
+          <button type="button" onClick={() => setTypeInvitation("rejoindre")}
+            className="eduai-focus flex-1 rounded-md py-1.5 text-xs font-medium transition-colors"
+            style={typeInvitation === "rejoindre" ? { backgroundColor: C.surface, color: C.encre, boxShadow: "0 1px 3px rgba(0,0,0,0.08)" } : { color: C.encreAttenue }}>
+            Rejoindre l'établissement
+          </button>
+          <button type="button" onClick={() => setTypeInvitation("classe")}
+            className="eduai-focus flex-1 rounded-md py-1.5 text-xs font-medium transition-colors"
+            style={typeInvitation === "classe" ? { backgroundColor: C.surface, color: C.encre, boxShadow: "0 1px 3px rgba(0,0,0,0.08)" } : { color: C.encreAttenue }}>
+            Enseigner une classe précise
+          </button>
+        </div>
+
+        <div className="flex gap-2">
+          <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email.enseignant@exemple.com"
+            className="eduai-focus flex-1 rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
+          <button type="submit" disabled={envoi} className="eduai-focus flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
+            {envoi ? <Loader2 size={12} className="eduai-spin" /> : <UserPlus size={13} />} Inviter
+          </button>
+        </div>
+
+        {typeInvitation === "classe" && (
+          <div className="grid grid-cols-2 gap-2">
+            <select required value={classeId} onChange={(e) => setClasseId(e.target.value)}
+              className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}>
+              <option value="">Classe...</option>
+              {classes.map((c) => <option key={c.id} value={c.id}>{c.nom} ({c.niveau})</option>)}
+            </select>
+            <select required value={matiereId} onChange={(e) => setMatiereId(e.target.value)}
+              className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}>
+              {matieres.map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
+            </select>
+          </div>
+        )}
+      </form>
+
+      {chargement ? <Chargement /> : (
+        <div className="space-y-2">
+          {invitations.map((inv) => {
+            const badge = badgeStatut(inv.statut);
+            return (
+              <div key={inv.id} className="flex items-center justify-between rounded-lg border px-3 py-2.5" style={{ borderColor: C.ligne }}>
+                <div>
+                  <p className="text-sm" style={{ color: C.encre }}>{inv.enseignant_email}</p>
+                  {inv.classe_nom && <p className="text-xs" style={{ color: C.encreAttenue }}>{inv.matiere_nom} · {inv.classe_nom}</p>}
+                </div>
+                <span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: badge.bg, color: badge.fg }}>{badge.label}</span>
+              </div>
+            );
+          })}
+          {invitations.length === 0 && <p className="text-sm text-center py-6" style={{ color: C.encreAttenue }}>Aucune invitation envoyée pour l'instant.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Écran : Structure scolaire (années, cycles, niveaux, classes)      */
+/* ------------------------------------------------------------------ */
+
+function BlocCreation({ ouvert, setOuvert, label, children, onSubmit, envoi }) {
+  if (!ouvert) {
+    return (
+      <button onClick={() => setOuvert(true)} className="eduai-focus flex items-center gap-1.5 text-xs font-medium" style={{ color: C.accentFonce }}>
+        <Plus size={13} /> {label}
+      </button>
+    );
+  }
+  return (
+    <form onSubmit={onSubmit} className="rounded-lg p-4 border space-y-2.5" style={{ borderColor: C.ligne, backgroundColor: C.fond }}>
+      {children}
+      <div className="flex gap-2 pt-1">
+        <button type="submit" disabled={envoi} className="eduai-focus rounded-lg px-3.5 py-2 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: C.encre, color: C.surface }}>
+          {envoi ? <Loader2 size={12} className="eduai-spin" /> : "Créer"}
+        </button>
+        <button type="button" onClick={() => setOuvert(false)} className="eduai-focus text-xs font-medium" style={{ color: C.encreDoux }}>Annuler</button>
+      </div>
+    </form>
+  );
+}
+
+const champStyle = { borderColor: C.ligne, backgroundColor: C.surface, color: C.encre };
+
+function SectionAnneesScolaires({ token, annees, onCree }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [libelle, setLibelle] = useState("");
+  const [debut, setDebut] = useState("");
+  const [fin, setFin] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState(null);
+
+  async function soumettre(e) {
+    e.preventDefault();
+    setEnvoi(true); setErreur(null);
+    try {
+      await apiFetch("/administration/annees-scolaires", { method: "POST", token, body: { libelle, date_debut: debut, date_fin: fin } });
+      setLibelle(""); setDebut(""); setFin(""); setOuvert(false);
+      onCree();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoi(false); }
+  }
+
+  return (
+    <div className="rounded-2xl p-6 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+      <div className="flex items-center gap-2 mb-4">
+        <Calendar size={16} color={C.encre} />
+        <h2 className="eduai-display text-lg" style={{ color: C.encre }}>Années scolaires</h2>
+      </div>
+      <p className="text-xs mb-4" style={{ color: C.encreAttenue }}>Une nouvelle année devient automatiquement l'année active — nécessaire pour créer des classes.</p>
+      <BandeauErreur message={erreur} />
+      <BlocCreation ouvert={ouvert} setOuvert={setOuvert} label="Ajouter une année scolaire" onSubmit={soumettre} envoi={envoi}>
+        <input required value={libelle} onChange={(e) => setLibelle(e.target.value)} placeholder="Libellé (ex : 2026-2027)"
+          className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle} />
+        <div className="grid grid-cols-2 gap-2">
+          <input required type="date" value={debut} onChange={(e) => setDebut(e.target.value)}
+            className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle} />
+          <input required type="date" value={fin} onChange={(e) => setFin(e.target.value)}
+            className="eduai-focus rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle} />
+        </div>
+      </BlocCreation>
+      <div className="space-y-1.5 mt-4">
+        {annees.map((a) => (
+          <div key={a.id} className="flex items-center justify-between text-sm px-1">
+            <span style={{ color: C.encre }}>{a.libelle}</span>
+            {a.est_active && <span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: C.vertFond, color: C.vert }}>Active</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SectionCycles({ token, cycles, onCree }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [nom, setNom] = useState("");
+  const [ordre, setOrdre] = useState(1);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState(null);
+
+  async function soumettre(e) {
+    e.preventDefault();
+    setEnvoi(true); setErreur(null);
+    try {
+      await apiFetch("/administration/cycles", { method: "POST", token, body: { nom, ordre: Number(ordre) } });
+      setNom(""); setOuvert(false);
+      onCree();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoi(false); }
+  }
+
+  return (
+    <div className="rounded-2xl p-6 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+      <div className="flex items-center gap-2 mb-4">
+        <Layers size={16} color={C.encre} />
+        <h2 className="eduai-display text-lg" style={{ color: C.encre }}>Cycles</h2>
+      </div>
+      <p className="text-xs mb-4" style={{ color: C.encreAttenue }}>Ex : "Premier Cycle" (6ème–3ème), "Second Cycle" (2nde–Terminale).</p>
+      <BandeauErreur message={erreur} />
+      <BlocCreation ouvert={ouvert} setOuvert={setOuvert} label="Ajouter un cycle" onSubmit={soumettre} envoi={envoi}>
+        <input required value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom (ex : Premier Cycle)"
+          className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle} />
+        <input required type="number" value={ordre} onChange={(e) => setOrdre(e.target.value)} placeholder="Ordre d'affichage"
+          className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle} />
+      </BlocCreation>
+      <div className="space-y-1.5 mt-4">
+        {cycles.map((c) => <div key={c.id} className="text-sm px-1" style={{ color: C.encre }}>{c.nom}</div>)}
+      </div>
+    </div>
+  );
+}
+
+function SectionNiveaux({ token, niveaux, cycles, onCree }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [nom, setNom] = useState("");
+  const [ordre, setOrdre] = useState(1);
+  const [cycleId, setCycleId] = useState(cycles[0]?.id || "");
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState(null);
+
+  async function soumettre(e) {
+    e.preventDefault();
+    setEnvoi(true); setErreur(null);
+    try {
+      await apiFetch("/administration/niveaux", { method: "POST", token, body: { cycle_id: cycleId, nom, ordre: Number(ordre) } });
+      setNom(""); setOuvert(false);
+      onCree();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoi(false); }
+  }
+
+  return (
+    <div className="rounded-2xl p-6 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+      <div className="flex items-center gap-2 mb-4">
+        <BookMarked size={16} color={C.encre} />
+        <h2 className="eduai-display text-lg" style={{ color: C.encre }}>Niveaux</h2>
+      </div>
+      <p className="text-xs mb-4" style={{ color: C.encreAttenue }}>Ex : "6ème", "5ème", "Terminale D"...</p>
+      <BandeauErreur message={erreur} />
+      {cycles.length === 0 ? (
+        <p className="text-xs" style={{ color: C.encreAttenue }}>Créez d'abord un cycle ci-contre.</p>
+      ) : (
+        <BlocCreation ouvert={ouvert} setOuvert={setOuvert} label="Ajouter un niveau" onSubmit={soumettre} envoi={envoi}>
+          <select value={cycleId} onChange={(e) => setCycleId(e.target.value)} required
+            className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle}>
+            {cycles.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
+          </select>
+          <input required value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom (ex : 5ème)"
+            className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle} />
+          <input required type="number" value={ordre} onChange={(e) => setOrdre(e.target.value)} placeholder="Ordre d'affichage"
+            className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle} />
+        </BlocCreation>
+      )}
+      <div className="space-y-1.5 mt-4">
+        {niveaux.map((n) => (
+          <div key={n.id} className="flex items-center justify-between text-sm px-1">
+            <span style={{ color: C.encre }}>{n.nom}</span>
+            <span className="text-xs" style={{ color: C.encreAttenue }}>{n.cycle_nom}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SectionClasses({ token, classesStructure, niveaux, onCree }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [nom, setNom] = useState("");
+  const [niveauId, setNiveauId] = useState(niveaux[0]?.id || "");
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState(null);
+
+  async function soumettre(e) {
+    e.preventDefault();
+    setEnvoi(true); setErreur(null);
+    try {
+      await apiFetch("/administration/classes", { method: "POST", token, body: { niveau_id: niveauId, nom } });
+      setNom(""); setOuvert(false);
+      onCree();
+    } catch (e) { setErreur(e.message); }
+    finally { setEnvoi(false); }
+  }
+
+  return (
+    <div className="rounded-2xl p-6 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
+      <div className="flex items-center gap-2 mb-4">
+        <School size={16} color={C.encre} />
+        <h2 className="eduai-display text-lg" style={{ color: C.encre }}>Classes</h2>
+      </div>
+      <p className="text-xs mb-4" style={{ color: C.encreAttenue }}>Ex : "6ème A", "5ème B"... Nécessite une année scolaire active.</p>
+      <BandeauErreur message={erreur} />
+      {niveaux.length === 0 ? (
+        <p className="text-xs" style={{ color: C.encreAttenue }}>Créez d'abord un niveau ci-contre.</p>
+      ) : (
+        <BlocCreation ouvert={ouvert} setOuvert={setOuvert} label="Ajouter une classe" onSubmit={soumettre} envoi={envoi}>
+          <select value={niveauId} onChange={(e) => setNiveauId(e.target.value)} required
+            className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle}>
+            {niveaux.map((n) => <option key={n.id} value={n.id}>{n.nom}</option>)}
+          </select>
+          <input required value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom (ex : 6ème A)"
+            className="eduai-focus w-full rounded-lg px-3 py-2 text-sm outline-none border" style={champStyle} />
+        </BlocCreation>
+      )}
+      <div className="space-y-1.5 mt-4">
+        {classesStructure.map((c) => (
+          <div key={c.id} className="flex items-center justify-between text-sm px-1">
+            <span style={{ color: C.encre }}>{c.nom}</span>
+            <span className="text-xs" style={{ color: C.encreAttenue }}>{c.niveau}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EcranStructure({ token }) {
+  const [annees, setAnnees] = useState([]);
+  const [cycles, setCycles] = useState([]);
+  const [niveaux, setNiveaux] = useState([]);
+  const [classesStructure, setClassesStructure] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState(null);
+
+  const charger = useCallback(() => {
+    setChargement(true); setErreur(null);
+    Promise.all([
+      apiFetch("/administration/annees-scolaires", { token }),
+      apiFetch("/administration/cycles", { token }),
+      apiFetch("/administration/niveaux", { token }),
+      apiFetch("/administration/classes", { token }),
+    ]).then(([a, c, n, cl]) => { setAnnees(a); setCycles(c); setNiveaux(n); setClassesStructure(cl); })
+      .catch((e) => setErreur(e.message)).finally(() => setChargement(false));
+  }, [token]);
+
+  useEffect(() => { charger(); }, [charger]);
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 sm:px-8 py-10 eduai-fade-in">
+      <h1 className="eduai-display text-3xl mb-2" style={{ color: C.encre }}>Structure de l'établissement</h1>
+      <p className="text-sm mb-8" style={{ color: C.encreDoux }}>
+        Organisez vos années scolaires, cycles, niveaux et classes — la base sur laquelle reposent élèves, notes et bulletins.
+      </p>
+
+      <BandeauErreur message={erreur} />
+
+      {chargement ? <Chargement /> : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <SectionAnneesScolaires token={token} annees={annees} onCree={charger} />
+          <SectionCycles token={token} cycles={cycles} onCree={charger} />
+          <SectionNiveaux token={token} niveaux={niveaux} cycles={cycles} onCree={charger} />
+          <SectionClasses token={token} classesStructure={classesStructure} niveaux={niveaux} onCree={charger} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Application                                                        */
 /* ------------------------------------------------------------------ */
 
@@ -1236,8 +1766,11 @@ export default function App() {
     setConnexionEnCours(true); setErreurConnexion(null);
     try {
       const { access_token } = await apiFetch("/auth/login", { method: "POST", body: { email, mot_de_passe: motDePasse } });
+      await apiFetch("/administration/matieres", { token: access_token });
       setToken(access_token);
-    } catch (e) { setErreurConnexion(e.message); }
+    } catch (e) {
+      setErreurConnexion(e.status === 401 ? "Ce compte n'a pas accès à cet espace." : e.message);
+    }
     finally { setConnexionEnCours(false); }
   }
 
@@ -1262,6 +1795,9 @@ export default function App() {
           {vue === "notifications" && <EcranNotificationsDiffusion token={token} classes={classes} />}
           {vue === "paiements" && <EcranPaiements token={token} />}
           {vue === "etablissement" && <EcranEtablissement token={token} classes={classes} matieres={matieres} />}
+          {vue === "structure" && <EcranStructure token={token} />}
+          {vue === "documents" && <EcranDocuments token={token} classes={classes} matieres={matieres} />}
+          {vue === "invitations" && <EcranInvitations token={token} classes={classes} matieres={matieres} />}
         </>
       )}
     </div>

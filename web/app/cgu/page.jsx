@@ -5,7 +5,7 @@ const C = {
   encre: "#22304A", encreDoux: "#5B6472", accent: "#B08D57",
 };
 
-export const metadata = { title: "Conditions Générales d'Utilisation — ÉduAI Afrique" };
+export const metadata = { title: "Conditions Générales d'Utilisation — OskarAI" };
 
 export default function CGU() {
   return (
@@ -16,11 +16,11 @@ export default function CGU() {
         <div className="rounded-xl p-6 border text-sm leading-relaxed" style={{ backgroundColor: C.surface, borderColor: C.ligne, color: C.encreDoux }}>
           <p className="mb-3">
             Cette page est un espace réservé — le texte définitif des Conditions Générales d'Utilisation
-            d'ÉduAI Afrique n'a pas encore été rédigé.
+            d'OskarAI n'a pas encore été rédigé.
           </p>
           <p>
             Pour toute question sur les conditions d'utilisation de la plateforme en attendant sa publication,
-            contactez l'équipe ÉduAI Afrique directement.
+            contactez l'équipe OskarAI directement.
           </p>
         </div>
       </div>

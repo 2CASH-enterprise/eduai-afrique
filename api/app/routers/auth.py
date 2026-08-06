@@ -72,7 +72,7 @@ def inscription_enseignant(payload: InscriptionEnseignant):
             return JSONResponse(
                 status_code=status.HTTP_202_ACCEPTED,
                 content=ReponseListeAttente(
-                    message=f"EduAI Afrique n'est pas encore disponible en {payload.pays}. "
+                    message=f"OskarAI n'est pas encore disponible en {payload.pays}. "
                             "Nous avons bien noté votre email et vous recontacterons dès l'ouverture."
                 ).model_dump(),
             )

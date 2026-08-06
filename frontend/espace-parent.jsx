@@ -9,9 +9,14 @@ import {
 /*  Configuration API                                                  */
 /* ------------------------------------------------------------------ */
 
-const API_BASE_URL = "http://89.116.111.3:8000";
+const API_BASE_URL = "http://178.104.56.200:8000";
 
-class ErreurApi extends Error {}
+class ErreurApi extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+}
 
 async function apiFetch(path, { method = "GET", token, body, params } = {}) {
   let url = `${API_BASE_URL}${path}`;
@@ -36,7 +41,7 @@ async function apiFetch(path, { method = "GET", token, body, params } = {}) {
   try { donnees = await reponse.json(); } catch { /* corps vide */ }
   if (!reponse.ok) {
     const message = donnees?.detail || `Erreur ${reponse.status}`;
-    throw new ErreurApi(typeof message === "string" ? message : JSON.stringify(message));
+    throw new ErreurApi(typeof message === "string" ? message : JSON.stringify(message), reponse.status);
   }
   return donnees;
 }
@@ -106,7 +111,7 @@ function EcranConnexion({ onConnexion, connexionEnCours, erreurConnexion }) {
       <div className="w-full max-w-sm eduai-fade-in">
         <div className="flex items-center gap-2 mb-10 justify-center">
           <GraduationCap size={26} color={C.encre} strokeWidth={1.75} />
-          <span className="eduai-display text-2xl" style={{ color: C.encre }}>ÉduAI <span style={{ color: C.accent }}>Afrique</span></span>
+          <span className="eduai-display text-2xl" style={{ color: C.encre }}>Oskar<span style={{ color: C.accent }}>AI</span></span>
         </div>
         <div className="rounded-2xl p-8 border" style={{ backgroundColor: C.surface, boxShadow: C.surfaceOmbre, borderColor: C.ligne }}>
           <h1 className="eduai-display text-xl mb-1" style={{ color: C.encre }}>Espace Parent</h1>
@@ -154,7 +159,7 @@ function BarreNav({ vue, setVue, onDeconnexion }) {
       style={{ backgroundColor: "rgba(250,248,243,0.92)", backdropFilter: "blur(6px)", borderColor: C.ligne }}>
       <button onClick={() => setVue("tableau-de-bord")} className="eduai-focus flex items-center gap-2">
         <GraduationCap size={20} color={C.encre} strokeWidth={1.75} />
-        <span className="eduai-display text-base hidden sm:inline" style={{ color: C.encre }}>ÉduAI Afrique</span>
+        <span className="eduai-display text-base hidden sm:inline" style={{ color: C.encre }}>OskarAI</span>
       </button>
       <nav className="flex items-center gap-4 overflow-x-auto">
         {items.map((it) => (
@@ -514,7 +519,10 @@ export default function App() {
     setChargementEnfants(true);
     apiFetch("/parent/enfants", { token })
       .then((d) => { setEnfants(d); if (d.length) setEnfantActif(d[0]); })
-      .catch((e) => setErreurEnfants(e.message))
+      .catch((e) => {
+        if (e.status === 401) { setToken(null); setErreurConnexion("Ce compte n'a pas accès à cet espace."); }
+        else setErreurEnfants(e.message);
+      })
       .finally(() => setChargementEnfants(false));
   }, [token]);
 

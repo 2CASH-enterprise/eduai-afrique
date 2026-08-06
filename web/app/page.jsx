@@ -30,7 +30,7 @@ const ESPACES = [
   { module: "administration", href: "/administration", label: "Administration", desc: "Comptes, bulletins, paiements", icon: Building2 },
 ];
 
-const API_BASE_URL = "http://89.116.111.3:8000";
+const API_BASE_URL = "http://178.104.56.200:8000";
 
 async function chargerModulesActifs() {
   try {
@@ -55,7 +55,7 @@ export default async function Accueil() {
           <div className="flex items-center justify-center gap-2 mb-3">
             <GraduationCap size={28} color={C.encre} strokeWidth={1.75} />
             <span className="eduai-display text-3xl" style={{ color: C.encre }}>
-              ÉduAI <span style={{ color: C.accent }}>Afrique</span>
+              Oskar<span style={{ color: C.accent }}>AI</span>
             </span>
           </div>
           <p className="text-center text-sm mb-1" style={{ color: C.encreDoux }}>
@@ -86,7 +86,7 @@ export default async function Accueil() {
 
       <footer className="px-6 py-6 text-center border-t" style={{ borderColor: C.ligne }}>
         <p className="text-xs" style={{ color: C.encreDoux }}>
-          © {new Date().getFullYear()} ÉduAI Afrique
+          © {new Date().getFullYear()} OskarAI
           <span className="mx-2">·</span>
           <Link href="/cgu" className="hover:underline" style={{ color: C.encreDoux }}>Conditions d'utilisation</Link>
           <span className="mx-2">·</span>
