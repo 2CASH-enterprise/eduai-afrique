@@ -251,19 +251,153 @@ const PAYS_DISPONIBLES = [
   "Rwanda", "Sénégal", "Seychelles", "Tchad", "Togo",
 ];
 
+const ETAPES_INSCRIPTION = [
+  { id: "bienvenue" },
+  { id: "email", champ: "email", type: "email", icon: Mail,
+    label: "Ton adresse email", sous: "Elle te servira à te connecter.", placeholder: "toi@exemple.cm" },
+  { id: "motDePasse", champ: "motDePasse", type: "password", icon: Lock,
+    label: "Choisis un mot de passe", sous: "Au moins 8 caractères.", placeholder: "Mot de passe" },
+  { id: "prenom", champ: "prenom", type: "text",
+    label: "Comment tu t'appelles ?", placeholder: "Ton prénom" },
+  { id: "nom", champ: "nom", type: "text",
+    label: "Et ton nom de famille ?", placeholder: "Ton nom" },
+  { id: "pays", champ: "pays", type: "select",
+    label: "Dans quel pays enseignes-tu ?", sous: "Détermine le programme officiel utilisé pour tes générations." },
+  { id: "specialite", champ: "specialite", type: "text", optionnel: true,
+    label: "Ta spécialité", sous: "Facultatif — tu pourras préciser tes matières plus tard.", placeholder: "Ex : Mathématiques" },
+  { id: "recap" },
+];
+
+function FormulaireInscriptionParEtapes({ onInscription, connexionEnCours, erreurConnexion, messageListeAttente }) {
+  const [index, setIndex] = useState(0);
+  const [valeurs, setValeurs] = useState({ email: "", motDePasse: "", prenom: "", nom: "", pays: "Cameroun", specialite: "" });
+  const [erreurEtape, setErreurEtape] = useState(null);
+
+  const etape = ETAPES_INSCRIPTION[index];
+
+  function majChamp(v) {
+    setValeurs((prev) => ({ ...prev, [etape.champ]: v }));
+    setErreurEtape(null);
+  }
+
+  function suivant() {
+    if (etape.champ && !etape.optionnel) {
+      const val = (valeurs[etape.champ] || "").trim();
+      if (!val) { setErreurEtape("Ce champ est nécessaire pour continuer."); return; }
+      if (etape.type === "email" && !val.includes("@")) { setErreurEtape("Cette adresse email ne semble pas valide."); return; }
+      if (etape.champ === "motDePasse" && val.length < 8) { setErreurEtape("Au moins 8 caractères."); return; }
+    }
+    if (index < ETAPES_INSCRIPTION.length - 1) setIndex(index + 1);
+  }
+
+  function precedent() {
+    setErreurEtape(null);
+    if (index > 0) setIndex(index - 1);
+  }
+
+  function validerInscription() {
+    onInscription({
+      email: valeurs.email, mot_de_passe: valeurs.motDePasse, nom: valeurs.nom,
+      prenom: valeurs.prenom, pays: valeurs.pays, specialite: valeurs.specialite || null,
+    });
+  }
+
+  if (messageListeAttente) {
+    return (
+      <div className="rounded-lg px-4 py-3 text-sm flex items-start gap-2" style={{ backgroundColor: C.bleuFond, color: C.encre }}>
+        <Mail size={15} className="mt-0.5 flex-shrink-0" />
+        <span>{messageListeAttente}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="h-[3px] rounded-full mb-6" style={{ backgroundColor: C.ligne }}>
+        <div className="h-full rounded-full transition-all" style={{ backgroundColor: C.accent, width: `${((index + 1) / ETAPES_INSCRIPTION.length) * 100}%` }} />
+      </div>
+
+      <BandeauErreur message={erreurConnexion || erreurEtape} />
+
+      {etape.id === "bienvenue" && (
+        <div className="mb-2">
+          <h2 className="eduai-display text-xl mb-1" style={{ color: C.encre }}>Bienvenue sur OskarAI</h2>
+          <p className="text-sm" style={{ color: C.encreDoux }}>Créons ton compte enseignant. Ça prend une minute.</p>
+        </div>
+      )}
+
+      {etape.id === "recap" && (
+        <div className="mb-2">
+          <h2 className="eduai-display text-xl mb-1" style={{ color: C.encre }}>Tout est bon ?</h2>
+          <p className="text-sm mb-4" style={{ color: C.encreDoux }}>Vérifie avant de créer ton compte.</p>
+          <div className="rounded-lg border text-sm px-3.5 py-2 space-y-1.5" style={{ borderColor: C.ligne, backgroundColor: C.fond }}>
+            {[
+              ["Nom", `${valeurs.prenom} ${valeurs.nom}`.trim() || "—"],
+              ["Email", valeurs.email || "—"],
+              ["Pays", valeurs.pays || "—"],
+              ["Spécialité", valeurs.specialite || "Non précisée"],
+            ].map(([label, val]) => (
+              <div key={label} className="flex items-center justify-between">
+                <span style={{ color: C.encreAttenue }}>{label}</span>
+                <span style={{ color: C.encre }}>{val}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {etape.champ && (
+        <label className="block mb-2">
+          <span className="text-xs font-medium mb-1.5 flex items-center gap-1.5" style={{ color: C.encreDoux }}>
+            {etape.icon && <etape.icon size={13} />} {etape.label}
+          </span>
+          {etape.sous && <span className="text-[11px] mb-1.5 block" style={{ color: C.encreAttenue }}>{etape.sous}</span>}
+          {etape.type === "select" ? (
+            <select value={valeurs.pays} onChange={(e) => majChamp(e.target.value)} autoFocus
+              className="eduai-focus w-full rounded-lg px-3.5 py-2.5 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}>
+              {PAYS_DISPONIBLES.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          ) : (
+            <input
+              type={etape.type} value={valeurs[etape.champ]} onChange={(e) => majChamp(e.target.value)}
+              placeholder={etape.placeholder} autoFocus
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); suivant(); } }}
+              className="eduai-focus w-full rounded-lg px-3.5 py-2.5 text-sm outline-none border"
+              style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}
+            />
+          )}
+        </label>
+      )}
+
+      <div className="flex gap-2 mt-4">
+        {index > 0 && (
+          <button type="button" onClick={precedent}
+            className="eduai-focus rounded-lg px-3.5 py-2.5 text-sm font-medium border" style={{ borderColor: C.ligne, color: C.encreDoux }}>
+            Retour
+          </button>
+        )}
+        <button
+          type="button" disabled={connexionEnCours}
+          onClick={etape.id === "recap" ? validerInscription : suivant}
+          className="eduai-focus flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-colors disabled:opacity-60"
+          style={{ backgroundColor: C.encre, color: C.surface }}
+        >
+          {connexionEnCours && <Loader2 size={14} className="eduai-spin" />}
+          {etape.id === "recap" ? "Créer mon compte" : etape.id === "bienvenue" ? "Commencer" : "Continuer"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function EcranConnexion({ onConnexion, onInscription, connexionEnCours, erreurConnexion, messageListeAttente }) {
   const [mode, setMode] = useState("connexion"); // "connexion" | "inscription"
   const [email, setEmail] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
-  const [nom, setNom] = useState("");
-  const [prenom, setPrenom] = useState("");
-  const [pays, setPays] = useState("Cameroun");
-  const [specialite, setSpecialite] = useState("");
 
   function soumettre(e) {
     e.preventDefault();
-    if (mode === "connexion") onConnexion(email, motDePasse);
-    else onInscription({ email, mot_de_passe: motDePasse, nom, prenom, pays, specialite: specialite || null });
+    onConnexion(email, motDePasse);
   }
 
   return (
@@ -295,73 +429,49 @@ function EcranConnexion({ onConnexion, onInscription, connexionEnCours, erreurCo
             </button>
           </div>
 
-          <BandeauErreur message={erreurConnexion} />
-
-          {messageListeAttente ? (
-            <div className="rounded-lg px-4 py-3 text-sm flex items-start gap-2" style={{ backgroundColor: C.bleuFond, color: C.encre }}>
-              <Mail size={15} className="mt-0.5 flex-shrink-0" />
-              <span>{messageListeAttente}</span>
-            </div>
+          {mode === "connexion" ? (
+            <>
+              <BandeauErreur message={erreurConnexion} />
+              <form onSubmit={soumettre} className="space-y-4">
+                <label className="block">
+                  <span className="text-xs font-medium mb-1.5 flex items-center gap-1.5" style={{ color: C.encreDoux }}>
+                    <Mail size={13} /> Adresse email
+                  </span>
+                  <input
+                    type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+                    placeholder="sophie.nguema@ecole.cm"
+                    className="eduai-focus w-full rounded-lg px-3.5 py-2.5 text-sm outline-none border"
+                    style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium mb-1.5 flex items-center gap-1.5" style={{ color: C.encreDoux }}>
+                    <Lock size={13} /> Mot de passe
+                  </span>
+                  <input
+                    type="password" required value={motDePasse} onChange={(e) => setMotDePasse(e.target.value)}
+                    placeholder="••••••••"
+                    className="eduai-focus w-full rounded-lg px-3.5 py-2.5 text-sm outline-none border"
+                    style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}
+                  />
+                </label>
+                <button
+                  type="submit" disabled={connexionEnCours}
+                  className="eduai-focus w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold mt-2 transition-colors disabled:opacity-60"
+                  style={{ backgroundColor: C.encre, color: C.surface }}
+                >
+                  {connexionEnCours && <Loader2 size={14} className="eduai-spin" />}
+                  Se connecter
+                </button>
+              </form>
+            </>
           ) : (
-          <form onSubmit={soumettre} className="space-y-4">
-            {mode === "inscription" && (
-              <div className="grid grid-cols-2 gap-2">
-                <input required value={prenom} onChange={(e) => setPrenom(e.target.value)} placeholder="Prénom"
-                  className="eduai-focus rounded-lg px-3.5 py-2.5 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
-                <input required value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom"
-                  className="eduai-focus rounded-lg px-3.5 py-2.5 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
-              </div>
-            )}
-            {mode === "inscription" && (
-              <label className="block">
-                <span className="text-xs font-medium mb-1.5 block" style={{ color: C.encreDoux }}>Pays</span>
-                <select value={pays} onChange={(e) => setPays(e.target.value)}
-                  className="eduai-focus w-full rounded-lg px-3.5 py-2.5 text-sm outline-none border"
-                  style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}>
-                  {PAYS_DISPONIBLES.map((p) => <option key={p} value={p}>{p}</option>)}
-                </select>
-                <span className="text-[11px] mt-1 block" style={{ color: C.encreAttenue }}>
-                  Détermine quel programme officiel sert de référence à vos générations.
-                </span>
-              </label>
-            )}
-            <label className="block">
-              <span className="text-xs font-medium mb-1.5 flex items-center gap-1.5" style={{ color: C.encreDoux }}>
-                <Mail size={13} /> Adresse email
-              </span>
-              <input
-                type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                placeholder="sophie.nguema@ecole.cm"
-                className="eduai-focus w-full rounded-lg px-3.5 py-2.5 text-sm outline-none border"
-                style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs font-medium mb-1.5 flex items-center gap-1.5" style={{ color: C.encreDoux }}>
-                <Lock size={13} /> Mot de passe
-              </span>
-              <input
-                type="password" required value={motDePasse} onChange={(e) => setMotDePasse(e.target.value)}
-                placeholder="••••••••"
-                className="eduai-focus w-full rounded-lg px-3.5 py-2.5 text-sm outline-none border"
-                style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }}
-              />
-            </label>
-            {mode === "inscription" && (
-              <input value={specialite} onChange={(e) => setSpecialite(e.target.value)} placeholder="Spécialité (optionnel, ex : Mathématiques)"
-                className="eduai-focus w-full rounded-lg px-3.5 py-2.5 text-sm outline-none border" style={{ borderColor: C.ligne, backgroundColor: C.fond, color: C.encre }} />
-            )}
-
-            <button
-              type="submit" disabled={connexionEnCours}
-              className="eduai-focus w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold mt-2 transition-colors disabled:opacity-60"
-              style={{ backgroundColor: C.encre, color: C.surface }}
-            >
-              {connexionEnCours && <Loader2 size={14} className="eduai-spin" />}
-              {mode === "connexion" ? "Se connecter" : "Créer mon compte"}
-            </button>
-          </form>
+            <FormulaireInscriptionParEtapes
+              onInscription={onInscription} connexionEnCours={connexionEnCours}
+              erreurConnexion={erreurConnexion} messageListeAttente={messageListeAttente}
+            />
           )}
+
           {mode === "inscription" && !messageListeAttente && (
             <p className="text-xs mt-4" style={{ color: C.encreAttenue }}>
               Utilisable dès maintenant pour préparer tes cours en mode libre. Si ton établissement rejoint la plateforme plus tard, il pourra t'inviter à le rejoindre.
